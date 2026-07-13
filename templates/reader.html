@@ -32,12 +32,20 @@
         .action-btn:hover { border-color: #2774d8; color: #175fb9; background: #f4f8fd; }
         .action-btn.primary { color: #fff; border-color: #2774d8; background: #2774d8; }
         .action-btn.primary:hover { background: #175fb9; }
+        .action-btn.active { color: #fff; border-color: #59636f; background: #59636f; }
+        .provider-btn { border-color: #d8dce1; background: #f8f9fb; }
+        .toolbar-divider { width: 1px; height: 24px; flex: 0 0 1px; background: #e1e4e8; }
         .toolbar-nav { color: #2774d8; text-decoration: none; font: 700 1rem -apple-system, sans-serif; padding: 5px; }
         .toolbar-nav.disabled { color: #bdc3ca; pointer-events: none; }
         #copy-status { position: fixed; right: 20px; bottom: 20px; z-index: 10; display: none; padding: 10px 14px; border-radius: 7px; background: #20242a; color: white; font: .85rem -apple-system, sans-serif; box-shadow: 0 3px 14px rgba(0,0,0,.2); }
         .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; }
         .content-container.asset { max-width: none; height: 100%; padding: 0; }
         .pdf-viewer { display: block; width: 100%; height: 100%; border: 0; }
+        .text-view { display: none; max-width: 820px; margin: 0 auto; padding: 44px 48px 80px; color: #24292f; }
+        .text-view h1 { margin: 0 0 8px; font: 700 1.55rem -apple-system, sans-serif; }
+        .text-view .text-meta { color: #727b86; margin-bottom: 28px; font: .85rem -apple-system, sans-serif; }
+        .text-view pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 1.02rem/1.75 Georgia, serif; }
+        .text-loading { color: #727b86; font-family: -apple-system, sans-serif; }
         .image-viewer { display: flex; justify-content: center; align-items: flex-start; min-height: 100%; padding: 40px; background: #e9ecef; }
         .image-viewer img { max-width: 100%; height: auto; box-shadow: 0 4px 24px rgba(0,0,0,.16); background: white; }
         .source-link { display: block; margin: -8px 0 18px; color: #68717b; overflow-wrap: anywhere; font-family: -apple-system, sans-serif; font-size: .78em; }
@@ -70,34 +78,7 @@
             <ul class="toc-list">
             {% for item in items %}
                 <li class="toc-item">
-                    <!--
-                        Matching Logic:
-                        If the TOC item filename matches the current chapter filename, mark active.
-                        Ideally we match spine indices, but Reader 3 TOC maps to filenames.
-                        We use a simple hash matching logic here.
-                    -->
                     {% set is_active = current_chapter.href == item.file_href %}
-
-                    <!--
-                       We need to find which linear chapter index (0, 1, 2) corresponds
-                       to this TOC entry file.
-                       Since that's hard to calculate in Jinja, we just link to the
-                       file anchor. BUT, to make our linear navigation work, we
-                       rely on the fact that the user is currently reading 'chapter_index'.
-
-                       Ideally, clicking a TOC link should find the 'index' of that file.
-                       For simplicity in this version: We link to the 'href' (filename)
-                       and let JavaScript or Backend handle it?
-
-                       Actually, let's just link to the file. The browser interprets #anchors.
-                       However, our router uses /read/book/INDEX.
-
-                       SIMPLE FIX: We won't link the TOC to the route index in this simple version
-                       unless we build a map. We will visually show structure,
-                       but rely on "Previous/Next" for linear reading.
-
-                       BETTER FIX: Use JavaScript to match filenames.
-                    -->
                     <a href="#" data-file="{{ item.file_href }}" onclick="findAndGo(this.dataset.file); return false"
                        class="toc-link {% if is_active %}active{% endif %}">
                         {{ item.title }}
@@ -117,11 +98,11 @@
     <!-- MAIN CONTENT -->
     <div id="main">
         <div class="reader-toolbar">
-            {% if prev_idx is not none %}<a class="toolbar-nav" href="/read/{{ book_id }}/{{ prev_idx }}" title="Previous section">←</a>{% else %}<span class="toolbar-nav disabled">←</span>{% endif %}
-            {% if next_idx is not none %}<a class="toolbar-nav" href="/read/{{ book_id }}/{{ next_idx }}" title="Next section">→</a>{% else %}<span class="toolbar-nav disabled">→</span>{% endif %}
+            {% if prev_idx is not none %}<a id="previous-section" class="toolbar-nav" href="/read/{{ book_id }}/{{ prev_idx }}" title="Previous section">←</a>{% else %}<a id="previous-section" class="toolbar-nav disabled" href="#" title="Previous section">←</a>{% endif %}
+            {% if next_idx is not none %}<a id="next-section" class="toolbar-nav" href="/read/{{ book_id }}/{{ next_idx }}" title="Next section">→</a>{% else %}<a id="next-section" class="toolbar-nav disabled" href="#" title="Next section">→</a>{% endif %}
             <div class="toolbar-title">
-                <strong>{{ current_chapter.title }}</strong>
-                <span>
+                <strong id="current-section-title">{{ current_chapter.title }}</strong>
+                <span id="current-section-meta">
                     {% if current_chapter.start_page %}Pages {{ current_chapter.start_page }}{% if current_chapter.end_page and current_chapter.end_page != current_chapter.start_page %}-{{ current_chapter.end_page }}{% endif %} · {% endif %}
                     {{ current_chapter.text|length }} characters
                 </span>
@@ -134,13 +115,27 @@
                 <button class="action-btn" type="button" onclick="copySection('explain')">Explain</button>
                 <button class="action-btn" type="button" onclick="copySection('summary')">Summarize</button>
                 <button class="action-btn" type="button" onclick="copySection('quiz')">Quiz me</button>
+                <span class="toolbar-divider"></span>
+                <button class="action-btn provider-btn" type="button" onclick="openInAi('chatgpt')">ChatGPT ↗</button>
+                <button class="action-btn provider-btn" type="button" onclick="openInAi('claude')">Claude ↗</button>
+                <button class="action-btn provider-btn" type="button" onclick="openInAi('gemini')" title="Uses Gemini web's query URL">Gemini ↗</button>
+                {% if document_type == "pdf" %}
+                    <span class="toolbar-divider"></span>
+                    <button id="pdf-mode-button" class="action-btn active" type="button" onclick="setViewMode('pdf')">PDF</button>
+                    <button id="text-mode-button" class="action-btn" type="button" onclick="setViewMode('text')">Text</button>
+                {% endif %}
             {% endif %}
         </div>
         <div class="reader-surface">
         {% if document_type == "pdf" %}
-        <div class="content-container asset">
-            <iframe class="pdf-viewer" src="/read/{{ book_id }}/asset#page={{ current_chapter.start_page or 1 }}" title="{{ book.metadata.title }}"></iframe>
+        <div id="pdf-view" class="content-container asset">
+            <iframe id="pdf-frame" class="pdf-viewer" src="/read/{{ book_id }}/asset#page={{ current_chapter.start_page or 1 }}" title="{{ book.metadata.title }}"></iframe>
         </div>
+        <article id="text-view" class="text-view">
+            <h1 id="text-view-title"></h1>
+            <div id="text-view-meta" class="text-meta"></div>
+            <pre id="text-view-content" class="text-loading">Loading extracted text…</pre>
+        </article>
         {% elif document_type == "image" %}
         <div class="content-container asset image-viewer">
             <img src="/read/{{ book_id }}/asset" alt="{{ book.metadata.title }}">
@@ -183,26 +178,119 @@
             {% endfor %}
         };
         const documentTitle = {{ book.metadata.title|tojson }};
-        const sectionTitle = {{ current_chapter.title|tojson }};
+        const documentType = {{ document_type|tojson }};
+        const sectionData = [
+            {% for ch in book.spine %}
+            {
+                href: {{ ch.href|tojson }},
+                title: {{ ch.title|tojson }},
+                startPage: {{ ch.start_page|default(none)|tojson }},
+                endPage: {{ ch.end_page|default(none)|tojson }},
+                characterCount: {{ ch.text|length }},
+            },
+            {% endfor %}
+        ];
+        const contextCache = new Map();
+        let currentChapterIndex = {{ chapter_index }};
+        let currentViewMode = "pdf";
 
         function findAndGo(filename) {
-            // The TOC usually has specific filenames e.g. "text/part001.html"
-            // Sometimes it has anchors "text/part001.html#header"
-            // We strip the anchor to find the page index
             const cleanFile = filename.split('#')[0];
-            const anchor = filename.split('#')[1];
-
             const idx = spineMap[cleanFile];
-
             if (idx !== undefined) {
-                let url = "/read/{{ book_id }}/" + idx;
-                // If there was an anchor, we could try to scroll to it,
-                // but simple page loads often lose anchor position without extra JS.
-                // Let's just go to the page.
-                window.location.href = url;
+                if (documentType === "pdf") {
+                    navigatePdfSection(idx);
+                } else {
+                    window.location.href = "/read/{{ book_id }}/" + idx;
+                }
             } else {
                 console.log("Could not find index for", filename);
             }
+        }
+
+        function pageLabel(section) {
+            if (!section.startPage) return `${section.characterCount.toLocaleString()} characters`;
+            const pages = section.endPage && section.endPage !== section.startPage
+                ? `Pages ${section.startPage}-${section.endPage}`
+                : `Page ${section.startPage}`;
+            return `${pages} · ${section.characterCount.toLocaleString()} characters`;
+        }
+
+        function updateNavigation() {
+            const section = sectionData[currentChapterIndex];
+            document.getElementById("current-section-title").textContent = section.title;
+            document.getElementById("current-section-meta").textContent = pageLabel(section);
+            document.querySelectorAll(".toc-link").forEach(link => {
+                link.classList.toggle("active", link.dataset.file === section.href);
+            });
+            for (const [elementId, offset] of [["previous-section", -1], ["next-section", 1]]) {
+                const link = document.getElementById(elementId);
+                const targetIndex = currentChapterIndex + offset;
+                const disabled = targetIndex < 0 || targetIndex >= sectionData.length;
+                link.classList.toggle("disabled", disabled);
+                link.href = disabled ? "#" : `/read/{{ book_id }}/${targetIndex}`;
+                link.onclick = event => {
+                    if (disabled) {
+                        event.preventDefault();
+                        return;
+                    }
+                    if (documentType !== "pdf") return;
+                    event.preventDefault();
+                    navigatePdfSection(targetIndex);
+                };
+            }
+        }
+
+        async function getSectionContext(index = currentChapterIndex) {
+            if (!contextCache.has(index)) {
+                const response = await fetch(`/api/read/{{ book_id }}/${index}/context`);
+                if (!response.ok) throw new Error("Context is unavailable");
+                contextCache.set(index, await response.json());
+            }
+            return contextCache.get(index);
+        }
+
+        async function renderTextSection() {
+            const section = sectionData[currentChapterIndex];
+            const content = document.getElementById("text-view-content");
+            document.getElementById("text-view-title").textContent = section.title;
+            document.getElementById("text-view-meta").textContent = pageLabel(section);
+            content.classList.add("text-loading");
+            content.textContent = "Loading extracted text…";
+            try {
+                const payload = await getSectionContext();
+                content.textContent = payload.text || "No extractable text is available for this section.";
+            } catch (error) {
+                content.textContent = error.message || "Text could not be loaded.";
+            }
+            content.classList.remove("text-loading");
+            document.querySelector(".reader-surface").scrollTop = 0;
+        }
+
+        function showPdfPage(section) {
+            const frame = document.getElementById("pdf-frame");
+            const nextSource = `/read/{{ book_id }}/asset#page=${section.startPage || 1}`;
+            if (frame.getAttribute("src") !== nextSource) frame.setAttribute("src", nextSource);
+        }
+
+        function navigatePdfSection(index, pushHistory = true) {
+            if (index < 0 || index >= sectionData.length) return;
+            currentChapterIndex = index;
+            const section = sectionData[index];
+            if (currentViewMode === "pdf") showPdfPage(section);
+            updateNavigation();
+            if (currentViewMode === "text") renderTextSection();
+            if (pushHistory) history.pushState({chapterIndex: index}, "", `/read/{{ book_id }}/${index}`);
+        }
+
+        function setViewMode(mode) {
+            currentViewMode = mode;
+            document.getElementById("pdf-view").style.display = mode === "pdf" ? "block" : "none";
+            document.getElementById("text-view").style.display = mode === "text" ? "block" : "none";
+            document.getElementById("pdf-mode-button").classList.toggle("active", mode === "pdf");
+            document.getElementById("text-mode-button").classList.toggle("active", mode === "text");
+            if (mode === "text") renderTextSection();
+            else showPdfPage(sectionData[currentChapterIndex]);
         }
 
         const promptPrefixes = {
@@ -226,9 +314,7 @@
 
         async function copySection(mode) {
             try {
-                const response = await fetch("/api/read/{{ book_id }}/{{ chapter_index }}/context");
-                if (!response.ok) throw new Error("Context is unavailable");
-                const payload = await response.json();
+                const payload = await getSectionContext();
                 if (!payload.character_count) {
                     showStatus("No extractable text in this section");
                     return;
@@ -247,11 +333,39 @@
                 showStatus("Select some text first");
                 return;
             }
-            const header = `# ${documentTitle}\nSection: ${sectionTitle}\n\n---\n\n`;
+            const header = `# ${documentTitle}\nSection: ${sectionData[currentChapterIndex].title}\n\n---\n\n`;
             try {
                 await writeText(header + selection, "Selection copied");
             } catch (error) {
                 showStatus("Copy failed");
+            }
+        }
+
+        async function openInAi(provider) {
+            const target = window.open("about:blank", "_blank");
+            if (!target) {
+                showStatus("Allow pop-ups to open the AI chat");
+                return;
+            }
+            try {
+                const payload = await getSectionContext();
+                if (!payload.character_count) throw new Error("No extractable text in this section");
+                const instruction = "Read this section with me. Start by explaining its main idea, then invite me to ask questions. Cite source pages when available.";
+                const fullPrompt = `${instruction}\n\n${payload.context}`;
+                const maxCharacters = 7800;
+                const prompt = fullPrompt.length > maxCharacters
+                    ? `${fullPrompt.slice(0, maxCharacters)}\n\n[Reader 3 truncated this URL prompt. Use Copy section for the complete text.]`
+                    : fullPrompt;
+                const providerUrls = {
+                    chatgpt: "https://chatgpt.com/?q=",
+                    claude: "https://claude.ai/new?q=",
+                    gemini: "https://gemini.google.com/app?q=",
+                };
+                target.location.replace(providerUrls[provider] + encodeURIComponent(prompt));
+                if (fullPrompt.length > maxCharacters) showStatus("Opened with a truncated URL prompt");
+            } catch (error) {
+                target.close();
+                showStatus(error.message || "AI chat could not be opened");
             }
         }
 
@@ -270,6 +384,15 @@
             } catch (error) {
                 showStatus("This browser could not copy the image");
             }
+        }
+
+        if (documentType === "pdf") {
+            updateNavigation();
+            window.addEventListener("popstate", event => {
+                const index = event.state?.chapterIndex;
+                if (Number.isInteger(index)) navigatePdfSection(index, false);
+                else window.location.reload();
+            });
         }
     </script>
 </body>

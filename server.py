@@ -127,6 +127,7 @@ async def section_context(book_id: str, chapter_index: int):
         "start_page": getattr(chapter, "start_page", None),
         "end_page": getattr(chapter, "end_page", None),
         "character_count": len(chapter.text),
+        "text": chapter.text,
         "context": context,
     }
 

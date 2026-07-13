@@ -153,11 +153,20 @@ class ServerTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 303)
         reader_url = response.headers["location"]
-        self.assertEqual(self.client.get(reader_url).status_code, 200)
+        reader_response = self.client.get(reader_url)
+        self.assertEqual(reader_response.status_code, 200)
+        self.assertIn('id="text-mode-button"', reader_response.text)
+        self.assertIn("navigatePdfSection", reader_response.text)
+        self.assertIn("https://chatgpt.com/?q=", reader_response.text)
+        self.assertIn("https://claude.ai/new?q=", reader_response.text)
+        self.assertIn("https://gemini.google.com/app?q=", reader_response.text)
         book_id = reader_url.split("/")[2]
         asset_response = self.client.get(f"/read/{book_id}/asset")
         self.assertEqual(asset_response.status_code, 200)
         self.assertEqual(asset_response.content, payload)
+        context_response = self.client.get(f"/api/read/{book_id}/0/context")
+        self.assertEqual(context_response.status_code, 200)
+        self.assertIn("text", context_response.json())
 
     def test_library_contains_upload_controls(self):
         response = self.client.get("/")

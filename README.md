@@ -35,6 +35,11 @@ Reader 3 keeps the source document visible while preparing each section as porta
 - **Explain**, **Summarize**, and **Quiz me** copy a task-specific prompt with the section context.
 - **Copy selection** handles shorter excerpts from EPUB and HTML documents.
 - **Copy image** prepares standalone images for a multimodal LLM.
+- PDF headings navigate without reloading the whole reader page.
+- **PDF / Text** switches between the original layout and fast extracted text.
+- **ChatGPT**, **Claude**, and **Gemini** open a new chat with the current section in the URL query.
+
+URL handoff is capped at 7,800 characters for browser compatibility. Use **Copy section** when a longer section must be sent in full. Gemini in Chrome can also use the current reader tab directly; Text mode gives it a simpler page to read.
 
 Scanned PDFs need OCR before their text can be used as LLM context. See [`docs/plan/llm-reading-mvp.md`](docs/plan/llm-reading-mvp.md) for the implemented scope and deferred work.
 
