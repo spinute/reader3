@@ -70,7 +70,7 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 
 - OCR for scanned PDFs and extracting text from standalone images.
 - Equation-to-LaTeX conversion.
-- Figure/caption association and multimodal section bundles.
+- Semantic figure/caption association and multimodal section bundles (raster figures are already extracted by page).
 - Authenticated provider APIs for ChatGPT, Claude, Apple Foundation Models, or Ollama.
 - Search, notes, highlights, reading-position sync, and retrieval across multiple sections.
 
@@ -79,9 +79,10 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 The browser handoff and reading-performance follow-up adds:
 
 - in-page PDF section navigation without a full reader-page reload;
-- a fast extracted-text mode alongside the original PDF;
+- a fast Markdown-style mode alongside the original PDF, with page headings and extracted raster figures;
 - lazy section-text loading and caching;
-- URL-query handoff buttons for ChatGPT, Claude, and Gemini;
+- synchronous URL-query handoff links for ChatGPT and Claude, avoiding popup-blocker failures;
+- an Ask Gemini action that prepares the current tab and displays Chrome's `Control-G` shortcut;
 - a 7,800-character URL limit with explicit truncation feedback.
 
-Direct provider APIs, authenticated conversations, and automatic Gemini in Chrome side-panel activation remain deferred. Gemini in Chrome can read the current tab through Chrome's own UI, but regular web pages do not have a public API for opening that privileged side panel.
+Direct provider APIs, authenticated conversations, OCR, equation-to-LaTeX conversion, and automatic Gemini in Chrome side-panel activation remain deferred. Gemini in Chrome can read the current tab through Chrome's own UI, but regular web pages do not have a public API for opening that privileged side panel.

@@ -29,6 +29,7 @@ from reader3 import (
 
 MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
 PDF_FALLBACK_SECTION_PAGES = 10
+PDF_MAX_IMAGES_PER_PAGE = 16
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif"}
 SUPPORTED_EXTENSIONS = {".epub", ".pdf", ".html", ".htm", *SUPPORTED_IMAGE_EXTENSIONS}
 
@@ -208,6 +209,41 @@ def _extract_pdf_pages(reader: PdfReader) -> list[str]:
     return pages
 
 
+def _extract_pdf_images(reader: PdfReader, output_dir: Path) -> dict[int, list[str]]:
+    """Extract useful raster figures while ignoring tiny PDF drawing fragments."""
+    images_dir = output_dir / "images"
+    page_images: dict[int, list[str]] = {}
+    for page_number, page in enumerate(reader.pages, start=1):
+        extracted = []
+        try:
+            candidates = page.images
+        except Exception:
+            continue
+        for image_file in candidates:
+            try:
+                width, height = image_file.image.size
+                if width < 120 or height < 120 or width * height < 25_000 or len(image_file.data) < 5_000:
+                    continue
+                extension = Path(image_file.name).suffix.lower()
+                if extension not in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
+                    extension = ".png"
+                filename = f"pdf-page-{page_number}-image-{len(extracted) + 1}{extension}"
+                images_dir.mkdir(parents=True, exist_ok=True)
+                destination = images_dir / filename
+                if extension == Path(image_file.name).suffix.lower():
+                    destination.write_bytes(image_file.data)
+                else:
+                    image_file.image.save(destination, format="PNG")
+                extracted.append(f"images/{filename}")
+                if len(extracted) >= PDF_MAX_IMAGES_PER_PAGE:
+                    break
+            except Exception:
+                continue
+        if extracted:
+            page_images[page_number] = extracted
+    return page_images
+
+
 def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
     reader = PdfReader(str(source))
     if reader.is_encrypted:
@@ -255,6 +291,7 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
         ]
 
     extracted_pages = _extract_pdf_pages(reader)
+    extracted_images = _extract_pdf_images(reader, output_dir)
     spine = []
     for index, start_page in enumerate(start_pages):
         end_page = start_pages[index + 1] - 1 if index + 1 < len(start_pages) else page_count
@@ -272,6 +309,11 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
             order=index,
             start_page=start_page,
             end_page=end_page,
+            media=[
+                image_path
+                for page_number in range(start_page, end_page + 1)
+                for image_path in extracted_images.get(page_number, [])
+            ],
         ))
 
     assets_dir = output_dir / "assets"
@@ -285,7 +327,7 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
         metadata=BookMetadata(title=title or "Untitled", language="en", authors=[author] if author else []),
         spine=spine,
         toc=toc,
-        images={},
+        images={image_path: image_path for paths in extracted_images.values() for image_path in paths},
         source_file=source.name,
         processed_at=datetime.now().isoformat(),
         document_type="pdf",

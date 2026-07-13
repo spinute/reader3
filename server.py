@@ -1,5 +1,6 @@
 import os
 import pickle
+import re
 import tempfile
 from functools import lru_cache
 from pathlib import Path
@@ -19,6 +20,11 @@ templates = Jinja2Templates(directory="templates")
 
 # Where are the book folders located?
 BOOKS_DIR = "."
+AI_URL_MAX_CHARS = 7800
+AI_PROVIDER_URLS = {
+    "chatgpt": "https://chatgpt.com/?q=",
+    "claude": "https://claude.ai/new?q=",
+}
 
 
 def list_books():
@@ -121,6 +127,20 @@ async def section_context(book_id: str, chapter_index: int):
         raise HTTPException(status_code=404, detail="Section not found")
     chapter = book.spine[chapter_index]
     context = format_section_context(book, chapter)
+    media = []
+    for media_path in getattr(chapter, "media", []):
+        match = re.search(r"pdf-page-(\d+)-image-", media_path)
+        media.append({
+            "url": f"/read/{book_id}/images/{os.path.basename(media_path)}",
+            "page": int(match.group(1)) if match else None,
+            "alt": f"Extracted figure from page {match.group(1)}" if match else "Extracted figure",
+        })
+    markdown = re.sub(r"^\[Page (\d+)\]$", r"## Page \1", chapter.text, flags=re.MULTILINE)
+    markdown = f"# {chapter.title}\n\n{markdown}".strip()
+    if media:
+        markdown += "\n\n## Extracted images\n\n" + "\n\n".join(
+            f"![{item['alt']}]({item['url']})" for item in media
+        )
     return {
         "document_title": book.metadata.title,
         "section_title": chapter.title,
@@ -128,8 +148,31 @@ async def section_context(book_id: str, chapter_index: int):
         "end_page": getattr(chapter, "end_page", None),
         "character_count": len(chapter.text),
         "text": chapter.text,
+        "markdown": markdown,
+        "media": media,
         "context": context,
     }
+
+
+@app.get("/open/{provider}/{book_id}/{chapter_index}")
+async def open_ai_chat(provider: str, book_id: str, chapter_index: int):
+    """Open a supported AI chat from a normal browser link (popup-safe)."""
+    provider_url = AI_PROVIDER_URLS.get(provider)
+    book = load_book_cached(book_id)
+    if not provider_url or not book or chapter_index < 0 or chapter_index >= len(book.spine):
+        raise HTTPException(status_code=404, detail="AI handoff not found")
+    chapter = book.spine[chapter_index]
+    instruction = (
+        "Read this section with me. Start by explaining its main idea, then invite me "
+        "to ask questions. Cite source pages when available."
+    )
+    full_prompt = f"{instruction}\n\n{format_section_context(book, chapter)}"
+    if len(full_prompt) > AI_URL_MAX_CHARS:
+        full_prompt = (
+            f"{full_prompt[:AI_URL_MAX_CHARS]}\n\n"
+            "[Reader 3 truncated this URL prompt. Use Copy section for the complete text.]"
+        )
+    return RedirectResponse(provider_url + quote(full_prompt, safe=""), status_code=303)
 
 @app.get("/read/{book_id}", response_class=HTMLResponse)
 async def redirect_to_first_chapter(book_id: str):
@@ -152,7 +195,7 @@ async def serve_asset(book_id: str):
     media_type = "application/pdf" if getattr(book, "document_type", "") == "pdf" else None
     return FileResponse(asset_path, media_type=media_type, content_disposition_type="inline")
 
-@app.get("/read/{book_id}/{chapter_index}", response_class=HTMLResponse)
+@app.get("/read/{book_id}/{chapter_index:int}", response_class=HTMLResponse)
 async def read_chapter(request: Request, book_id: str, chapter_index: int):
     """The main reader interface."""
     book = load_book_cached(book_id)

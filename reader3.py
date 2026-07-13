@@ -30,6 +30,7 @@ class ChapterContent:
     order: int        # Linear reading order
     start_page: Optional[int] = None
     end_page: Optional[int] = None
+    media: List[str] = field(default_factory=list)
 
 
 @dataclass

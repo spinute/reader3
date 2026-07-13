@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from PIL import Image
 from pypdf import PdfWriter
 
 import reader3
@@ -102,6 +103,20 @@ class ImporterTests(unittest.TestCase):
             self.assertEqual([section.start_page for section in book.spine], [1, 11])
             self.assertEqual([section.end_page for section in book.spine], [10, 12])
 
+    def test_pdf_raster_figures_are_extracted_by_page(self):
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "figure.pdf"
+            image = Image.effect_noise((320, 320), 100).convert("RGB")
+            image.save(source, "PDF", resolution=144)
+            book_id = import_file(source, root)
+            with (Path(root) / book_id / "book.pkl").open("rb") as handle:
+                book = pickle.load(handle)
+
+            self.assertEqual(len(book.spine[0].media), 1)
+            extracted = Path(root) / book_id / book.spine[0].media[0]
+            self.assertTrue(extracted.is_file())
+            self.assertGreater(extracted.stat().st_size, 5_000)
+
     def test_context_includes_section_and_source_pages(self):
         book = reader3.Book(
             metadata=reader3.BookMetadata(title="A book", language="en", authors=["An Author"]),
@@ -157,16 +172,33 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(reader_response.status_code, 200)
         self.assertIn('id="text-mode-button"', reader_response.text)
         self.assertIn("navigatePdfSection", reader_response.text)
-        self.assertIn("https://chatgpt.com/?q=", reader_response.text)
-        self.assertIn("https://claude.ai/new?q=", reader_response.text)
-        self.assertIn("https://gemini.google.com/app?q=", reader_response.text)
+        self.assertIn('href="/open/chatgpt/', reader_response.text)
+        self.assertIn('href="/open/claude/', reader_response.text)
+        self.assertIn("Ask Gemini (⌃G)", reader_response.text)
+        self.assertNotIn("gemini.google.com", reader_response.text)
+        self.assertIn("frame.replaceWith(nextFrame)", reader_response.text)
         book_id = reader_url.split("/")[2]
         asset_response = self.client.get(f"/read/{book_id}/asset")
         self.assertEqual(asset_response.status_code, 200)
         self.assertEqual(asset_response.content, payload)
         context_response = self.client.get(f"/api/read/{book_id}/0/context")
         self.assertEqual(context_response.status_code, 200)
-        self.assertIn("text", context_response.json())
+        context = context_response.json()
+        self.assertIn("text", context)
+        self.assertIn("markdown", context)
+        self.assertEqual(context["media"], [])
+
+        chatgpt_response = self.client.get(
+            f"/open/chatgpt/{book_id}/0", follow_redirects=False
+        )
+        self.assertEqual(chatgpt_response.status_code, 303)
+        self.assertTrue(chatgpt_response.headers["location"].startswith("https://chatgpt.com/?q="))
+
+        claude_response = self.client.get(
+            f"/open/claude/{book_id}/0", follow_redirects=False
+        )
+        self.assertEqual(claude_response.status_code, 303)
+        self.assertTrue(claude_response.headers["location"].startswith("https://claude.ai/new?q="))
 
     def test_library_contains_upload_controls(self):
         response = self.client.get("/")

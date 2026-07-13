@@ -28,7 +28,7 @@
         .toolbar-title { min-width: 140px; margin-right: auto; }
         .toolbar-title strong { display: block; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem; }
         .toolbar-title span { display: block; color: #727b86; font-size: .72rem; margin-top: 2px; }
-        .action-btn { border: 1px solid #ccd2d9; border-radius: 6px; background: #fff; color: #35404b; cursor: pointer; padding: 7px 10px; white-space: nowrap; font: 600 .76rem -apple-system, sans-serif; }
+        .action-btn { display: inline-block; border: 1px solid #ccd2d9; border-radius: 6px; background: #fff; color: #35404b; cursor: pointer; padding: 7px 10px; white-space: nowrap; text-decoration: none; font: 600 .76rem -apple-system, sans-serif; }
         .action-btn:hover { border-color: #2774d8; color: #175fb9; background: #f4f8fd; }
         .action-btn.primary { color: #fff; border-color: #2774d8; background: #2774d8; }
         .action-btn.primary:hover { background: #175fb9; }
@@ -44,7 +44,12 @@
         .text-view { display: none; max-width: 820px; margin: 0 auto; padding: 44px 48px 80px; color: #24292f; }
         .text-view h1 { margin: 0 0 8px; font: 700 1.55rem -apple-system, sans-serif; }
         .text-view .text-meta { color: #727b86; margin-bottom: 28px; font: .85rem -apple-system, sans-serif; }
-        .text-view pre { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font: 1.02rem/1.75 Georgia, serif; }
+        .markdown-content { font: 1.02rem/1.75 Georgia, serif; }
+        .markdown-content h2 { margin: 38px 0 14px; padding-bottom: 7px; border-bottom: 1px solid #e1e4e8; font: 700 1.15rem -apple-system, sans-serif; }
+        .markdown-content p { margin: 0 0 1.2em; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .markdown-content figure { margin: 24px 0 32px; padding: 14px; border: 1px solid #e1e4e8; border-radius: 8px; background: #fff; }
+        .markdown-content figure img { display: block; max-width: 100%; max-height: 680px; margin: 0 auto; object-fit: contain; }
+        .markdown-content figcaption { margin-top: 10px; color: #727b86; text-align: center; font: .78rem -apple-system, sans-serif; }
         .text-loading { color: #727b86; font-family: -apple-system, sans-serif; }
         .image-viewer { display: flex; justify-content: center; align-items: flex-start; min-height: 100%; padding: 40px; background: #e9ecef; }
         .image-viewer img { max-width: 100%; height: auto; box-shadow: 0 4px 24px rgba(0,0,0,.16); background: white; }
@@ -112,29 +117,30 @@
             {% else %}
                 {% if document_type != "pdf" %}<button class="action-btn" type="button" onclick="copySelection()">Copy selection</button>{% endif %}
                 <button class="action-btn primary" type="button" onclick="copySection('plain')">Copy section</button>
+                <button class="action-btn" type="button" onclick="copyMarkdown()">Copy Markdown</button>
                 <button class="action-btn" type="button" onclick="copySection('explain')">Explain</button>
                 <button class="action-btn" type="button" onclick="copySection('summary')">Summarize</button>
                 <button class="action-btn" type="button" onclick="copySection('quiz')">Quiz me</button>
                 <span class="toolbar-divider"></span>
-                <button class="action-btn provider-btn" type="button" onclick="openInAi('chatgpt')">ChatGPT ↗</button>
-                <button class="action-btn provider-btn" type="button" onclick="openInAi('claude')">Claude ↗</button>
-                <button class="action-btn provider-btn" type="button" onclick="openInAi('gemini')" title="Uses Gemini web's query URL">Gemini ↗</button>
+                <a id="chatgpt-link" class="action-btn provider-btn" target="_blank" rel="noopener" href="/open/chatgpt/{{ book_id }}/{{ chapter_index }}">ChatGPT ↗</a>
+                <a id="claude-link" class="action-btn provider-btn" target="_blank" rel="noopener" href="/open/claude/{{ book_id }}/{{ chapter_index }}">Claude ↗</a>
+                <button class="action-btn provider-btn" type="button" onclick="prepareForGemini()" title="Prepare this section, then open Chrome Ask Gemini with Control-G">Ask Gemini (⌃G)</button>
                 {% if document_type == "pdf" %}
                     <span class="toolbar-divider"></span>
                     <button id="pdf-mode-button" class="action-btn active" type="button" onclick="setViewMode('pdf')">PDF</button>
-                    <button id="text-mode-button" class="action-btn" type="button" onclick="setViewMode('text')">Text</button>
+                    <button id="text-mode-button" class="action-btn" type="button" onclick="setViewMode('text')">Markdown</button>
                 {% endif %}
             {% endif %}
         </div>
         <div class="reader-surface">
         {% if document_type == "pdf" %}
         <div id="pdf-view" class="content-container asset">
-            <iframe id="pdf-frame" class="pdf-viewer" src="/read/{{ book_id }}/asset#page={{ current_chapter.start_page or 1 }}" title="{{ book.metadata.title }}"></iframe>
+            <iframe id="pdf-frame" class="pdf-viewer" src="/read/{{ book_id }}/asset?pageView={{ current_chapter.start_page or 1 }}#page={{ current_chapter.start_page or 1 }}" title="{{ book.metadata.title }}"></iframe>
         </div>
         <article id="text-view" class="text-view">
             <h1 id="text-view-title"></h1>
             <div id="text-view-meta" class="text-meta"></div>
-            <pre id="text-view-content" class="text-loading">Loading extracted text…</pre>
+            <div id="text-view-content" class="markdown-content text-loading">Loading extracted text…</div>
         </article>
         {% elif document_type == "image" %}
         <div class="content-container asset image-viewer">
@@ -239,6 +245,10 @@
                     navigatePdfSection(targetIndex);
                 };
             }
+            for (const provider of ["chatgpt", "claude"]) {
+                const link = document.getElementById(`${provider}-link`);
+                if (link) link.href = `/open/${provider}/{{ book_id }}/${currentChapterIndex}`;
+            }
         }
 
         async function getSectionContext(index = currentChapterIndex) {
@@ -259,7 +269,43 @@
             content.textContent = "Loading extracted text…";
             try {
                 const payload = await getSectionContext();
-                content.textContent = payload.text || "No extractable text is available for this section.";
+                content.replaceChildren();
+                const marker = /^\[Page (\d+)\]\s*$/gm;
+                const matches = [...(payload.text || "").matchAll(marker)];
+                const appendParagraphs = text => {
+                    for (const paragraphText of text.trim().split(/\n{2,}/).filter(Boolean)) {
+                        const paragraph = document.createElement("p");
+                        paragraph.textContent = paragraphText;
+                        content.appendChild(paragraph);
+                    }
+                };
+                const appendImages = page => {
+                    for (const item of (payload.media || []).filter(media => page === null || media.page === page)) {
+                        const figure = document.createElement("figure");
+                        const image = document.createElement("img");
+                        const caption = document.createElement("figcaption");
+                        image.src = item.url;
+                        image.alt = item.alt;
+                        image.loading = "lazy";
+                        caption.textContent = item.alt;
+                        figure.append(image, caption);
+                        content.appendChild(figure);
+                    }
+                };
+                if (matches.length) {
+                    matches.forEach((match, index) => {
+                        const page = Number(match[1]);
+                        const nextIndex = matches[index + 1]?.index ?? payload.text.length;
+                        const heading = document.createElement("h2");
+                        heading.textContent = `Page ${page}`;
+                        content.appendChild(heading);
+                        appendParagraphs(payload.text.slice(match.index + match[0].length, nextIndex));
+                        appendImages(page);
+                    });
+                } else {
+                    appendParagraphs(payload.text || "No extractable text is available for this section.");
+                    appendImages(null);
+                }
             } catch (error) {
                 content.textContent = error.message || "Text could not be loaded.";
             }
@@ -269,8 +315,12 @@
 
         function showPdfPage(section) {
             const frame = document.getElementById("pdf-frame");
-            const nextSource = `/read/{{ book_id }}/asset#page=${section.startPage || 1}`;
-            if (frame.getAttribute("src") !== nextSource) frame.setAttribute("src", nextSource);
+            const page = section.startPage || 1;
+            const nextSource = `/read/{{ book_id }}/asset?pageView=${page}#page=${page}`;
+            if (frame.getAttribute("src") === nextSource) return;
+            const nextFrame = frame.cloneNode(false);
+            nextFrame.setAttribute("src", nextSource);
+            frame.replaceWith(nextFrame);
         }
 
         function navigatePdfSection(index, pushHistory = true) {
@@ -327,6 +377,15 @@
             }
         }
 
+        async function copyMarkdown() {
+            try {
+                const payload = await getSectionContext();
+                await writeText(payload.markdown, "Markdown copied");
+            } catch (error) {
+                showStatus(error.message || "Copy failed");
+            }
+        }
+
         async function copySelection() {
             const selection = window.getSelection().toString().trim();
             if (!selection) {
@@ -341,32 +400,10 @@
             }
         }
 
-        async function openInAi(provider) {
-            const target = window.open("about:blank", "_blank");
-            if (!target) {
-                showStatus("Allow pop-ups to open the AI chat");
-                return;
-            }
-            try {
-                const payload = await getSectionContext();
-                if (!payload.character_count) throw new Error("No extractable text in this section");
-                const instruction = "Read this section with me. Start by explaining its main idea, then invite me to ask questions. Cite source pages when available.";
-                const fullPrompt = `${instruction}\n\n${payload.context}`;
-                const maxCharacters = 7800;
-                const prompt = fullPrompt.length > maxCharacters
-                    ? `${fullPrompt.slice(0, maxCharacters)}\n\n[Reader 3 truncated this URL prompt. Use Copy section for the complete text.]`
-                    : fullPrompt;
-                const providerUrls = {
-                    chatgpt: "https://chatgpt.com/?q=",
-                    claude: "https://claude.ai/new?q=",
-                    gemini: "https://gemini.google.com/app?q=",
-                };
-                target.location.replace(providerUrls[provider] + encodeURIComponent(prompt));
-                if (fullPrompt.length > maxCharacters) showStatus("Opened with a truncated URL prompt");
-            } catch (error) {
-                target.close();
-                showStatus(error.message || "AI chat could not be opened");
-            }
+        function prepareForGemini() {
+            if (documentType === "pdf") setViewMode("text");
+            window.focus();
+            showStatus("Ready — press ⌃G to open Chrome Ask Gemini");
         }
 
         async function copyImage() {
@@ -386,8 +423,8 @@
             }
         }
 
+        updateNavigation();
         if (documentType === "pdf") {
-            updateNavigation();
             window.addEventListener("popstate", event => {
                 const index = event.state?.chapterIndex;
                 if (Number.isInteger(index)) navigatePdfSection(index, false);
