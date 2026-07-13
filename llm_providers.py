@@ -175,7 +175,9 @@ async def _call_google(request: LLMChatRequest) -> str:
 
 async def _call_openai_compatible(request: LLMChatRequest) -> str:
     base_url = request.base_url or "http://127.0.0.1:11434/v1"
-    endpoint = base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
+    endpoint = (
+        base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
+    )
     headers = {"Authorization": f"Bearer {request.api_token}"} if request.api_token else {}
     messages = [{"role": "system", "content": request.instructions}]
     messages.extend(message.model_dump() for message in request.messages)

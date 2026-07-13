@@ -180,7 +180,7 @@ def _split_pdf_section_texts(
                 if next_entry and next_entry.page == start_page:
                     next_heading = _phrase_span(page_text, next_entry.title)
                     if next_heading:
-                        page_text = page_text[:next_heading.start()].rstrip()
+                        page_text = page_text[: next_heading.start()].rstrip()
                     elif not heading:
                         page_text = ""
             if page_text:
@@ -193,8 +193,7 @@ def _normalize_pdf_page_text(text: str) -> str:
     text = text.replace("\u00ad", "")
     lines = text.splitlines()
     lines = [
-        line for line in lines
-        if "© The Author(s)" not in line and "https://doi.org/" not in line
+        line for line in lines if "© The Author(s)" not in line and "https://doi.org/" not in line
     ]
     if lines:
         first = lines[0].strip()
@@ -232,7 +231,9 @@ def _ocr_pdf_page(page) -> str:
         candidates = list(page.images)
         if not candidates:
             return ""
-        image_file = max(candidates, key=lambda candidate: candidate.image.width * candidate.image.height)
+        image_file = max(
+            candidates, key=lambda candidate: candidate.image.width * candidate.image.height
+        )
         image = image_file.image
         if image.width * image.height < 250_000:
             return ""
@@ -280,7 +281,8 @@ def _extract_pdf_pages(reader: PdfReader) -> list[str]:
     for lines in page_lines:
         last_index = len(lines) - 1
         filtered = [
-            line for index, line in enumerate(lines)
+            line
+            for index, line in enumerate(lines)
             if not ((index < 2 or index > last_index - 2) and signature(line) in repeated_edges)
         ]
         pages.append(_normalize_pdf_page_text("\n".join(filtered)))
@@ -306,7 +308,11 @@ def _extract_pdf_captions(reader: PdfReader) -> dict[int, list[str]]:
                 continuation = lines[cursor]
                 if not continuation or caption_pattern.match(continuation):
                     break
-                caption = caption[:-1] + continuation if caption.endswith("-") else f"{caption} {continuation}"
+                caption = (
+                    caption[:-1] + continuation
+                    if caption.endswith("-")
+                    else f"{caption} {continuation}"
+                )
                 cursor += 1
             captions.append(caption[:320])
         if captions:
@@ -327,7 +333,12 @@ def _extract_pdf_images(reader: PdfReader, output_dir: Path) -> dict[int, list[s
         for image_file in candidates:
             try:
                 width, height = image_file.image.size
-                if width < 120 or height < 120 or width * height < 25_000 or len(image_file.data) < 5_000:
+                if (
+                    width < 120
+                    or height < 120
+                    or width * height < 25_000
+                    or len(image_file.data) < 5_000
+                ):
                     continue
                 extension = Path(image_file.name).suffix.lower()
                 if extension not in {".jpg", ".jpeg", ".png", ".gif", ".webp"}:
@@ -366,17 +377,23 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
     bookmarks = _pdf_outline(reader)
     flat_bookmarks = list(_flatten_bookmarks(bookmarks))
     if flat_bookmarks:
-        entries = [item[1] for item in sorted(enumerate(flat_bookmarks), key=lambda item: (item[1].page, item[0]))]
+        entries = [
+            item[1]
+            for item in sorted(enumerate(flat_bookmarks), key=lambda item: (item[1].page, item[0]))
+        ]
         toc = _bookmark_toc(bookmarks)
         if entries[0].page > 1:
             front_matter = _PdfBookmark(title="Front matter", page=1, href="pdf-front-matter")
             entries.insert(0, front_matter)
-            toc.insert(0, TOCEntry(
-                title=front_matter.title,
-                href=front_matter.href,
-                file_href=front_matter.href,
-                anchor="",
-            ))
+            toc.insert(
+                0,
+                TOCEntry(
+                    title=front_matter.title,
+                    href=front_matter.href,
+                    file_href=front_matter.href,
+                    anchor="",
+                ),
+            )
     else:
         start_pages = list(range(1, page_count + 1, PDF_FALLBACK_SECTION_PAGES))
         entries = [
@@ -384,9 +401,9 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
                 page=page,
                 href=f"pdf-page-{page}",
                 title=(
-                f"Pages {page}-{min(page + PDF_FALLBACK_SECTION_PAGES - 1, page_count)}"
-                if page < page_count
-                else f"Page {page}"
+                    f"Pages {page}-{min(page + PDF_FALLBACK_SECTION_PAGES - 1, page_count)}"
+                    if page < page_count
+                    else f"Page {page}"
                 ),
             )
             for page in start_pages
@@ -404,7 +421,8 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
     section_captions: list[dict[str, str]] = [{} for _ in entries]
     for page_number, image_paths in extracted_images.items():
         candidates = [
-            index for index, (start_page, end_page) in enumerate(page_ranges)
+            index
+            for index, (start_page, end_page) in enumerate(page_ranges)
             if start_page <= page_number <= end_page
         ]
         if not candidates:
@@ -414,7 +432,8 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
             caption = captions[min(image_index, len(captions) - 1)] if captions else ""
             caption_hint = " ".join(caption.split()[:8])
             matching = [
-                index for index in candidates
+                index
+                for index in candidates
                 if caption_hint and _phrase_span(section_texts[index], caption_hint)
             ]
             target = matching[0] if matching else candidates[-1]
@@ -425,18 +444,20 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
     spine = []
     for index, entry in enumerate(entries):
         start_page, end_page = page_ranges[index]
-        spine.append(ChapterContent(
-            id=entry.href,
-            href=entry.href,
-            title=entry.title,
-            content="",
-            text=section_texts[index],
-            order=index,
-            start_page=start_page,
-            end_page=end_page,
-            media=section_media[index],
-            media_captions=section_captions[index],
-        ))
+        spine.append(
+            ChapterContent(
+                id=entry.href,
+                href=entry.href,
+                title=entry.title,
+                content="",
+                text=section_texts[index],
+                order=index,
+                start_page=start_page,
+                end_page=end_page,
+                media=section_media[index],
+                media_captions=section_captions[index],
+            )
+        )
 
     assets_dir = output_dir / "assets"
     assets_dir.mkdir(parents=True, exist_ok=True)
@@ -446,10 +467,14 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
     title = str(metadata.get("/Title") or source.stem.replace("_", " ")).strip()
     author = str(metadata.get("/Author") or "").strip()
     return Book(
-        metadata=BookMetadata(title=title or "Untitled", language="en", authors=[author] if author else []),
+        metadata=BookMetadata(
+            title=title or "Untitled", language="en", authors=[author] if author else []
+        ),
         spine=spine,
         toc=toc,
-        images={image_path: image_path for paths in extracted_images.values() for image_path in paths},
+        images={
+            image_path: image_path for paths in extracted_images.values() for image_path in paths
+        },
         source_file=source.name,
         processed_at=datetime.now().isoformat(),
         document_type="pdf",
@@ -463,7 +488,20 @@ def _sanitize_html(raw_html: str, base_url: str | None = None) -> tuple[str, str
     soup = BeautifulSoup(raw_html, "html.parser")
     title = soup.title.get_text(" ", strip=True) if soup.title else ""
 
-    for tag in soup(["script", "style", "iframe", "object", "embed", "form", "button", "input", "textarea", "select"]):
+    for tag in soup(
+        [
+            "script",
+            "style",
+            "iframe",
+            "object",
+            "embed",
+            "form",
+            "button",
+            "input",
+            "textarea",
+            "select",
+        ]
+    ):
         tag.decompose()
     for comment in soup.find_all(string=lambda text: isinstance(text, Comment)):
         comment.extract()
@@ -498,7 +536,11 @@ def _sanitize_html(raw_html: str, base_url: str | None = None) -> tuple[str, str
             if not value:
                 continue
             parsed = urlparse(value.strip())
-            allowed = {"", "http", "https", "mailto"} if attribute == "href" else {"", "http", "https", "data"}
+            allowed = (
+                {"", "http", "https", "mailto"}
+                if attribute == "href"
+                else {"", "http", "https", "data"}
+            )
             if parsed.scheme.lower() not in allowed:
                 del node.attrs[attribute]
 
@@ -507,7 +549,22 @@ def _sanitize_html(raw_html: str, base_url: str | None = None) -> tuple[str, str
     for br in text_root.find_all("br"):
         br.replace_with("\n")
     for block in text_root.find_all(
-        ["article", "section", "div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "pre", "tr"]
+        [
+            "article",
+            "section",
+            "div",
+            "p",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "li",
+            "blockquote",
+            "pre",
+            "tr",
+        ]
     ):
         block.insert_before("\n\n")
         block.append("\n\n")
@@ -545,7 +602,9 @@ def _html_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
     )
 
 
-def import_file(source_path: str | Path, output_root: str | Path = ".", source_url: str | None = None) -> str:
+def import_file(
+    source_path: str | Path, output_root: str | Path = ".", source_url: str | None = None
+) -> str:
     source = Path(source_path)
     extension = source.suffix.lower()
     if extension not in SUPPORTED_EXTENSIONS:
@@ -578,7 +637,9 @@ def _validate_public_url(url: str) -> None:
     if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise DocumentImportError("URL must start with http:// or https://")
     try:
-        addresses = socket.getaddrinfo(parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80))
+        addresses = socket.getaddrinfo(
+            parsed.hostname, parsed.port or (443 if parsed.scheme == "https" else 80)
+        )
     except socket.gaierror as exc:
         raise DocumentImportError("Could not resolve URL host") from exc
     for address in addresses:
@@ -617,7 +678,9 @@ def download_url(url: str, destination_dir: str | Path) -> tuple[Path, str]:
     destination_dir = Path(destination_dir)
     destination_dir.mkdir(parents=True, exist_ok=True)
 
-    with httpx.Client(timeout=30, follow_redirects=False, headers={"User-Agent": "reader3/0.2"}) as client:
+    with httpx.Client(
+        timeout=30, follow_redirects=False, headers={"User-Agent": "reader3/0.2"}
+    ) as client:
         for _ in range(6):
             _validate_public_url(current_url)
             with client.stream("GET", current_url) as response:
@@ -631,8 +694,14 @@ def download_url(url: str, destination_dir: str | Path) -> tuple[Path, str]:
                 content_length = response.headers.get("content-length", "")
                 if content_length.isdigit() and int(content_length) > MAX_DOWNLOAD_BYTES:
                     raise DocumentImportError("URL download is larger than 100 MB")
-                extension = _extension_from_response(current_url, response.headers.get("content-type", ""))
-                name = _slugify(Path(urlparse(current_url).path).stem or urlparse(current_url).hostname or "download")
+                extension = _extension_from_response(
+                    current_url, response.headers.get("content-type", "")
+                )
+                name = _slugify(
+                    Path(urlparse(current_url).path).stem
+                    or urlparse(current_url).hostname
+                    or "download"
+                )
                 destination = destination_dir / f"{name}{extension}"
                 total = 0
                 with destination.open("wb") as output:

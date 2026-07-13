@@ -188,5 +188,6 @@
             document.getElementById("apple-status").textContent = apple.available ? "Available on this Mac" : (apple.reason || "Unavailable");
         }).catch(() => document.getElementById("apple-status").textContent = "Availability check failed");
     </script>
+    {% include "_dev_reload.html" %}
 </body>
 </html>

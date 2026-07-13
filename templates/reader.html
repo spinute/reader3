@@ -53,11 +53,14 @@
         .text-view .text-meta { color: #727b86; margin-bottom: 28px; font: .85rem -apple-system, sans-serif; }
         .markdown-content { font: 1.02rem/1.75 Georgia, serif; }
         .markdown-content .page-marker { display: inline-block; margin: 30px 0 14px; padding: 3px 8px; border-radius: 999px; background: #eef1f4; color: #68717b; font: 600 .72rem -apple-system, sans-serif; }
-        .paragraph-row { position: relative; padding-right: 28px; cursor: copy; }
+        .paragraph-row { border-radius: 6px; cursor: pointer; transition: background-color .12s ease; }
+        .paragraph-row:hover { background: #f4f7fb; }
         .paragraph-row a, .paragraph-row button, .paragraph-row input, .paragraph-row textarea, .paragraph-row select { cursor: pointer; }
-        .paragraph-row > .copy-icon { position: absolute; right: 0; bottom: .2em; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+        .paragraph-row > .copy-icon { display: inline-block; margin-left: 4px; visibility: hidden; opacity: 0; pointer-events: none; vertical-align: .08em; transition: opacity .12s ease; }
         .paragraph-row:hover > .copy-icon { visibility: visible; opacity: 1; pointer-events: auto; }
-        .markdown-content p { margin: 0 0 1.2em; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .markdown-content .paragraph-row { margin: 0 -8px 1.2em; padding: 2px 8px; }
+        .markdown-content .paragraph-row > p { display: inline; margin: 0; }
+        .markdown-content p { white-space: pre-wrap; overflow-wrap: anywhere; }
         .markdown-content figure { margin: 24px 0 32px; padding: 14px; border: 1px solid #e1e4e8; border-radius: 8px; background: #fff; }
         .markdown-content figure img { display: block; max-width: 100%; max-height: 680px; margin: 0 auto; object-fit: contain; }
         .markdown-content figcaption { margin-top: 10px; color: #727b86; text-align: center; font: .78rem -apple-system, sans-serif; }
@@ -69,7 +72,9 @@
         /* Content Styling (Basic normalization for the book HTML) */
         .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
         .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: #333; }
-        .book-content p { margin-bottom: 1.5em; text-align: justify; }
+        .book-content p { text-align: justify; }
+        .book-content .paragraph-row { margin: 0 -8px 1.5em; padding: 2px 8px; }
+        .book-content .paragraph-row > p { display: inline; margin: 0; }
         .book-content .generated-html-paragraph { margin-bottom: 1.5em; }
 
         /* In-page view controls */
@@ -868,5 +873,6 @@
             });
         }
     </script>
+    {% include "_dev_reload.html" %}
 </body>
 </html>

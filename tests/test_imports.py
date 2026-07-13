@@ -84,11 +84,11 @@ class ImporterTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             source = Path(root) / "article.html"
             source.write_text(
-                '<html><head><title>Test article</title></head><body>'
-                '<script>alert(1)</script><h1>Hello</h1>'
+                "<html><head><title>Test article</title></head><body>"
+                "<script>alert(1)</script><h1>Hello</h1>"
                 '<a href="javascript:alert(1)" onclick="alert(1)">bad</a>'
-                '<p>First paragraph.</p><p>Second paragraph.</p>'
-                '<font>Third paragraph.<br><br>Fourth paragraph.</font>'
+                "<p>First paragraph.</p><p>Second paragraph.</p>"
+                "<font>Third paragraph.<br><br>Fourth paragraph.</font>"
                 '<img src="/figure.png"></body></html>',
                 encoding="utf-8",
             )
@@ -185,11 +185,21 @@ class ImporterTests(unittest.TestCase):
     def test_context_includes_section_and_source_pages(self):
         book = reader3.Book(
             metadata=reader3.BookMetadata(title="A book", language="en", authors=["An Author"]),
-            spine=[], toc=[], images={}, source_file="book.pdf", processed_at="now",
+            spine=[],
+            toc=[],
+            images={},
+            source_file="book.pdf",
+            processed_at="now",
         )
         chapter = reader3.ChapterContent(
-            id="one", href="one", title="A section", content="", text="Important text.", order=0,
-            start_page=4, end_page=7,
+            id="one",
+            href="one",
+            title="A section",
+            content="",
+            text="Important text.",
+            order=0,
+            start_page=4,
+            end_page=7,
         )
         context = reader3.format_section_context(book, chapter)
         self.assertIn("Section: A section", context)
@@ -251,6 +261,9 @@ class ServerTests(unittest.TestCase):
         self.assertIn("copyTocSection", reader_response.text)
         self.assertIn("makeParagraphClickable(row, text)", reader_response.text)
         self.assertIn(".paragraph-row:hover > .copy-icon", reader_response.text)
+        self.assertIn(".paragraph-row:hover { background: #f4f7fb; }", reader_response.text)
+        self.assertIn("cursor: pointer", reader_response.text)
+        self.assertIn("display: inline-block", reader_response.text)
         self.assertIn("visibility: hidden", reader_response.text)
         self.assertIn(".text-heading-row > .copy-icon", reader_response.text)
         self.assertIn(".toc-row > .copy-icon", reader_response.text)
@@ -279,11 +292,11 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(chatgpt_response.status_code, 303)
         self.assertTrue(chatgpt_response.headers["location"].startswith("https://chatgpt.com/?q="))
         self.assertLess(len(chatgpt_response.headers["location"].encode()), 2_048)
-        self.assertIn("常に日本語で回答してください。", unquote(chatgpt_response.headers["location"]))
-
-        claude_response = self.client.get(
-            f"/open/claude/{book_id}/0", follow_redirects=False
+        self.assertIn(
+            "常に日本語で回答してください。", unquote(chatgpt_response.headers["location"])
         )
+
+        claude_response = self.client.get(f"/open/claude/{book_id}/0", follow_redirects=False)
         self.assertEqual(claude_response.status_code, 303)
         self.assertTrue(claude_response.headers["location"].startswith("https://claude.ai/new?q="))
 
@@ -329,12 +342,16 @@ class ServerTests(unittest.TestCase):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn('action="/import/upload"', response.text)
+        self.assertNotIn("checkDevelopmentServer", response.text)
+        self.assertEqual(self.client.get("/__dev__/version").status_code, 404)
         self.assertIn('action="/import/url"', response.text)
 
     def test_url_form_imports_downloaded_html(self):
         def fake_download(url, destination_dir):
             destination = Path(destination_dir) / "page.html"
-            destination.write_text("<title>Remote article</title><h1>Remote article</h1>", encoding="utf-8")
+            destination.write_text(
+                "<title>Remote article</title><h1>Remote article</h1>", encoding="utf-8"
+            )
             return destination, "https://example.com/page"
 
         with patch("server.download_url", side_effect=fake_download):
@@ -348,8 +365,10 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(reader_response.status_code, 200)
         self.assertIn('id="html-mode-button"', reader_response.text)
         self.assertIn('id="text-mode-button"', reader_response.text)
-        self.assertIn('onclick="setViewMode(\'html\')"', reader_response.text)
-        context_response = self.client.get(response.headers["location"].replace("/read/", "/api/read/") + "/context")
+        self.assertIn("onclick=\"setViewMode('html')\"", reader_response.text)
+        context_response = self.client.get(
+            response.headers["location"].replace("/read/", "/api/read/") + "/context"
+        )
         self.assertEqual(context_response.status_code, 200)
         self.assertIn("Remote article", context_response.json()["context"])
 

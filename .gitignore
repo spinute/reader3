@@ -1,6 +1,9 @@
 # Python-generated files
 __pycache__/
 *.py[oc]
+.ruff_cache/
+.pytest_cache/
+.coverage
 build/
 dist/
 wheels/
@@ -8,6 +11,7 @@ wheels/
 
 # Virtual environments
 .venv
+.DS_Store
 
 # Custom
 *_data/

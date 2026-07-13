@@ -1,0 +1,24 @@
+{% if dev_mode %}
+<script>
+    (() => {
+        const loadedVersion = {{ dev_server_version|tojson }};
+        let reloadStarted = false;
+
+        async function checkDevelopmentServer() {
+            try {
+                const response = await fetch("/__dev__/version", {cache: "no-store"});
+                if (!response.ok) return;
+                const {version} = await response.json();
+                if (version !== loadedVersion && !reloadStarted) {
+                    reloadStarted = true;
+                    window.location.reload();
+                }
+            } catch (_) {
+                // The server is briefly unavailable while uvicorn restarts.
+            }
+        }
+
+        window.setInterval(checkDevelopmentServer, 400);
+    })();
+</script>
+{% endif %}

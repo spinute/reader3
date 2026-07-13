@@ -16,13 +16,33 @@ This project was 90% vibe coded just to illustrate how one can very easily [read
 
 ## Usage
 
-The project uses [uv](https://docs.astral.sh/uv/). Start the server:
+The project uses [uv](https://docs.astral.sh/uv/). Install dependencies and start the server:
 
 ```bash
-uv run server.py
+make install
+make run
 ```
 
 Visit [localhost:8123](http://localhost:8123/), then upload a document or paste a public URL. Files and URL downloads are limited to 100 MB. Private and local network URLs are rejected.
+
+## Development
+
+Start the development server with Python and template watching:
+
+```bash
+make dev
+```
+
+Changes to `*.py` and `templates/*.html` restart the server and automatically reload open Reader 3 pages. The watcher uses polling so it also works reliably when the repository is stored on an external volume.
+
+The development commands follow the same single-entry-point structure as the sibling `web-start` project:
+
+```bash
+make check   # lint, formatting, and Python syntax
+make test    # unit tests
+make ready   # check + test; also runs in CI
+make format  # apply Ruff formatting
+```
 
 ## Reading with an LLM
 
