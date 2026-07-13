@@ -17,8 +17,9 @@
         ul.toc-list { list-style: none; padding-left: 0; margin: 0; }
         ul.toc-list ul { padding-left: 20px; } /* Indent children */
         li.toc-item { margin-bottom: 5px; }
-        .toc-row { display: flex; align-items: flex-start; gap: 4px; }
-        a.toc-link { flex: 1; min-width: 0; text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 4px 0; line-height: 1.4; }
+        .toc-row { display: block; }
+        a.toc-link { min-width: 0; text-decoration: none; color: #495057; font-size: 0.95em; display: inline; padding: 4px 0; line-height: 1.4; }
+        .toc-row > .copy-icon { margin-left: 3px; vertical-align: middle; }
         a.toc-link:hover { color: #000; text-decoration: underline; }
         a.toc-link.active { color: #d63384; font-weight: bold; }
         .copy-icon { flex: 0 0 auto; border: 0; border-radius: 5px; background: transparent; color: #87909a; cursor: pointer; padding: 4px 5px; font: 600 .78rem -apple-system, sans-serif; }
@@ -46,14 +47,16 @@
         .content-container.asset { max-width: none; height: 100%; padding: 0; }
         .pdf-viewer { display: block; width: 100%; height: 100%; border: 0; }
         .text-view { display: none; max-width: 820px; margin: 0 auto; padding: 44px 48px 80px; color: #24292f; }
-        .text-heading-row { display: flex; align-items: flex-start; gap: 8px; }
-        .text-view h1 { flex: 1; margin: 0 0 8px; font: 700 1.55rem -apple-system, sans-serif; }
+        .text-heading-row { display: block; margin-bottom: 8px; }
+        .text-view h1 { display: inline; margin: 0; font: 700 1.55rem -apple-system, sans-serif; }
+        .text-heading-row > .copy-icon { margin-left: 4px; vertical-align: .15em; }
         .text-view .text-meta { color: #727b86; margin-bottom: 28px; font: .85rem -apple-system, sans-serif; }
         .markdown-content { font: 1.02rem/1.75 Georgia, serif; }
         .markdown-content .page-marker { display: inline-block; margin: 30px 0 14px; padding: 3px 8px; border-radius: 999px; background: #eef1f4; color: #68717b; font: 600 .72rem -apple-system, sans-serif; }
-        .paragraph-row { position: relative; padding-right: 28px; }
-        .paragraph-row > .copy-icon { position: absolute; top: 1px; right: 0; opacity: .38; }
-        .paragraph-row:hover > .copy-icon, .paragraph-row > .copy-icon:focus { opacity: 1; }
+        .paragraph-row { position: relative; padding-right: 28px; cursor: copy; }
+        .paragraph-row a, .paragraph-row button, .paragraph-row input, .paragraph-row textarea, .paragraph-row select { cursor: pointer; }
+        .paragraph-row > .copy-icon { position: absolute; right: 0; bottom: .2em; visibility: hidden; opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+        .paragraph-row:hover > .copy-icon { visibility: visible; opacity: 1; pointer-events: auto; }
         .markdown-content p { margin: 0 0 1.2em; white-space: pre-wrap; overflow-wrap: anywhere; }
         .markdown-content figure { margin: 24px 0 32px; padding: 14px; border: 1px solid #e1e4e8; border-radius: 8px; background: #fff; }
         .markdown-content figure img { display: block; max-width: 100%; max-height: 680px; margin: 0 auto; object-fit: contain; }
@@ -418,8 +421,25 @@
             button.className = "copy-icon";
             button.title = label;
             button.textContent = "⧉";
-            button.onclick = () => writeText(text, "Copied").catch(() => showStatus("Copy failed"));
+            button.onclick = event => {
+                event.stopPropagation();
+                copyParagraphText(text);
+            };
             return button;
+        }
+
+        function copyParagraphText(text) {
+            writeText(text, "Paragraph copied").catch(() => showStatus("Copy failed"));
+        }
+
+        function makeParagraphClickable(row, text) {
+            row.addEventListener("click", event => {
+                const target = event.target instanceof Element ? event.target : null;
+                if (target?.closest("a, button, input, textarea, select, label")) return;
+                const selection = window.getSelection();
+                if (selection && !selection.isCollapsed) return;
+                copyParagraphText(text);
+            });
         }
 
         function appendCopyableParagraph(container, text) {
@@ -428,6 +448,7 @@
             row.className = "paragraph-row";
             paragraph.textContent = text;
             row.append(paragraph, copyButton(text));
+            makeParagraphClickable(row, text);
             container.appendChild(row);
         }
 
@@ -805,7 +826,10 @@
                     body.append(...children);
                     const text = body.textContent.replace(/\s+/g, " ").trim();
                     row.appendChild(body);
-                    if (text) row.appendChild(copyButton(text));
+                    if (text) {
+                        row.appendChild(copyButton(text));
+                        makeParagraphClickable(row, text);
+                    }
                     parent.appendChild(row);
                 }
             });
@@ -814,7 +838,9 @@
                 const row = document.createElement("div");
                 row.className = "paragraph-row";
                 paragraph.replaceWith(row);
-                row.append(paragraph, copyButton(paragraph.textContent.trim()));
+                const text = paragraph.textContent.trim();
+                row.append(paragraph, copyButton(text));
+                makeParagraphClickable(row, text);
             });
         }
 
