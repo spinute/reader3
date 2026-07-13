@@ -29,7 +29,8 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 - Keep the original PDF bytes and render them without conversion.
 - Read PDF metadata, outline/bookmarks, and page text with `pypdf`.
 - Convert the outline into reader3's nested TOC.
-- Build ordered, non-overlapping sections from unique outline destinations.
+- Build ordered sections from every outline entry.
+- Preserve multiple outline headings on one page and split extracted text at their visible heading positions.
 - Associate each section with a start page, end page, title, and extracted text.
 - If the PDF has no usable outline, create page-range sections so it remains navigable and copyable.
 - Normalize extracted text by removing repeated headers/footers, joining line-break hyphenation, and collapsing layout whitespace conservatively.

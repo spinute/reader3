@@ -136,7 +136,7 @@ async def section_context(book_id: str, chapter_index: int):
             "page": int(match.group(1)) if match else None,
             "alt": caption or (f"Extracted figure from page {match.group(1)}" if match else "Extracted figure"),
         })
-    markdown = re.sub(r"^\[Page (\d+)\]$", r"## Page \1", chapter.text, flags=re.MULTILINE)
+    markdown = re.sub(r"^\[Page (\d+)\]$", r"_Page \1_", chapter.text, flags=re.MULTILINE)
     markdown = f"# {chapter.title}\n\n{markdown}".strip()
     if media:
         markdown += "\n\n## Extracted images\n\n" + "\n\n".join(

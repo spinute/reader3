@@ -29,6 +29,7 @@ Visit [localhost:8123](http://localhost:8123/), then upload a document or paste 
 Reader 3 keeps the source document visible while preparing each section as portable LLM context:
 
 - PDF bookmarks become a nested table of contents with page-range navigation.
+- Multiple PDF outline headings on the same page remain separate Markdown sections.
 - Extractable PDF text is stored by section while the original PDF remains unchanged.
 - Image-only PDF pages use local Tesseract OCR when it is installed; imports still work without it.
 - Extracted raster figures use visible `Figure` captions when the PDF text contains them.
@@ -38,7 +39,7 @@ Reader 3 keeps the source document visible while preparing each section as porta
 - **Copy selection** handles shorter excerpts from EPUB and HTML documents.
 - **Copy image** prepares standalone images for a multimodal LLM.
 - PDF headings navigate without reloading the whole reader page.
-- **PDF / Markdown** switches between the original layout and fast extracted text with page headings and available raster figures.
+- **PDF / Markdown** switches between the original layout and heading-scoped extracted text with page labels and available raster figures.
 - **ChatGPT** and **Claude** open a new chat with the current section in the URL query.
 - **Ask Gemini (⌃G)** prepares the Markdown view for Gemini in Chrome; press `Control-G` to open Chrome's Ask Gemini UI for the current tab.
 

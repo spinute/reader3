@@ -131,17 +131,62 @@ def _flatten_bookmarks(bookmarks: list[_PdfBookmark]):
         yield from _flatten_bookmarks(bookmark.children)
 
 
-def _bookmark_toc(bookmarks: list[_PdfBookmark], page_hrefs: dict[int, str]) -> list[TOCEntry]:
+def _bookmark_toc(bookmarks: list[_PdfBookmark]) -> list[TOCEntry]:
     return [
         TOCEntry(
             title=bookmark.title,
-            href=page_hrefs[bookmark.page],
-            file_href=page_hrefs[bookmark.page],
+            href=bookmark.href,
+            file_href=bookmark.href,
             anchor="",
-            children=_bookmark_toc(bookmark.children, page_hrefs),
+            children=_bookmark_toc(bookmark.children),
         )
         for bookmark in bookmarks
     ]
+
+
+def _phrase_span(text: str, phrase: str, start: int = 0):
+    tokens = re.findall(r"[^\W_]+", phrase, flags=re.UNICODE)
+    if not tokens:
+        return None
+    pattern = r"(?<!\w)" + r"[\W_]+".join(re.escape(token) for token in tokens) + r"(?!\w)"
+    return re.search(pattern, text[start:], flags=re.IGNORECASE)
+
+
+def _section_page_ranges(entries: list[_PdfBookmark], page_count: int) -> list[tuple[int, int]]:
+    ranges = []
+    for index, entry in enumerate(entries):
+        next_page = entries[index + 1].page if index + 1 < len(entries) else page_count + 1
+        end_page = entry.page if next_page <= entry.page else next_page - 1
+        ranges.append((entry.page, min(end_page, page_count)))
+    return ranges
+
+
+def _split_pdf_section_texts(
+    extracted_pages: list[str], entries: list[_PdfBookmark], page_count: int
+) -> tuple[list[str], list[tuple[int, int]]]:
+    """Split outline entries on the same page at their visible heading text."""
+    ranges = _section_page_ranges(entries, page_count)
+    section_texts = []
+    for index, entry in enumerate(entries):
+        start_page, end_page = ranges[index]
+        next_entry = entries[index + 1] if index + 1 < len(entries) else None
+        page_parts = []
+        for page_number in range(start_page, end_page + 1):
+            page_text = extracted_pages[page_number - 1]
+            if page_number == start_page and entry.title != "Front matter":
+                heading = _phrase_span(page_text, entry.title)
+                content_start = heading.end() if heading else 0
+                page_text = page_text[content_start:].lstrip(" .:–—-\n")
+                if next_entry and next_entry.page == start_page:
+                    next_heading = _phrase_span(page_text, next_entry.title)
+                    if next_heading:
+                        page_text = page_text[:next_heading.start()].rstrip()
+                    elif not heading:
+                        page_text = ""
+            if page_text:
+                page_parts.append(f"[Page {page_number}]\n{page_text}")
+        section_texts.append("\n\n".join(page_parts))
+    return section_texts, ranges
 
 
 def _normalize_pdf_page_text(text: str) -> str:
@@ -320,67 +365,77 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
         raise DocumentImportError("PDF contains no pages")
     bookmarks = _pdf_outline(reader)
     flat_bookmarks = list(_flatten_bookmarks(bookmarks))
-    page_titles: dict[int, str] = {}
-    for bookmark in flat_bookmarks:
-        page_titles.setdefault(bookmark.page, bookmark.title)
-
-    start_pages = sorted(page_titles)
-    if not start_pages:
+    if flat_bookmarks:
+        entries = [item[1] for item in sorted(enumerate(flat_bookmarks), key=lambda item: (item[1].page, item[0]))]
+        toc = _bookmark_toc(bookmarks)
+        if entries[0].page > 1:
+            front_matter = _PdfBookmark(title="Front matter", page=1, href="pdf-front-matter")
+            entries.insert(0, front_matter)
+            toc.insert(0, TOCEntry(
+                title=front_matter.title,
+                href=front_matter.href,
+                file_href=front_matter.href,
+                anchor="",
+            ))
+    else:
         start_pages = list(range(1, page_count + 1, PDF_FALLBACK_SECTION_PAGES))
-        page_titles = {
-            page: (
+        entries = [
+            _PdfBookmark(
+                page=page,
+                href=f"pdf-page-{page}",
+                title=(
                 f"Pages {page}-{min(page + PDF_FALLBACK_SECTION_PAGES - 1, page_count)}"
                 if page < page_count
                 else f"Page {page}"
+                ),
             )
             for page in start_pages
-        }
-    elif start_pages[0] > 1:
-        page_titles[1] = "Front matter"
-        start_pages.insert(0, 1)
-
-    page_hrefs = {page: f"pdf-page-{page}" for page in start_pages}
-    if bookmarks:
-        toc = _bookmark_toc(bookmarks, page_hrefs)
-        if start_pages[0] == 1 and not any(bookmark.page == 1 for bookmark in flat_bookmarks):
-            toc.insert(0, TOCEntry(title="Front matter", href=page_hrefs[1], file_href=page_hrefs[1], anchor=""))
-    else:
+        ]
         toc = [
-            TOCEntry(title=page_titles[page], href=page_hrefs[page], file_href=page_hrefs[page], anchor="")
-            for page in start_pages
+            TOCEntry(title=entry.title, href=entry.href, file_href=entry.href, anchor="")
+            for entry in entries
         ]
 
     extracted_pages = _extract_pdf_pages(reader)
     extracted_images = _extract_pdf_images(reader, output_dir)
     extracted_captions = _extract_pdf_captions(reader)
+    section_texts, page_ranges = _split_pdf_section_texts(extracted_pages, entries, page_count)
+    section_media: list[list[str]] = [[] for _ in entries]
+    section_captions: list[dict[str, str]] = [{} for _ in entries]
+    for page_number, image_paths in extracted_images.items():
+        candidates = [
+            index for index, (start_page, end_page) in enumerate(page_ranges)
+            if start_page <= page_number <= end_page
+        ]
+        if not candidates:
+            continue
+        captions = extracted_captions.get(page_number, [])
+        for image_index, image_path in enumerate(image_paths):
+            caption = captions[min(image_index, len(captions) - 1)] if captions else ""
+            caption_hint = " ".join(caption.split()[:8])
+            matching = [
+                index for index in candidates
+                if caption_hint and _phrase_span(section_texts[index], caption_hint)
+            ]
+            target = matching[0] if matching else candidates[-1]
+            section_media[target].append(image_path)
+            if caption:
+                section_captions[target][image_path] = caption
+
     spine = []
-    for index, start_page in enumerate(start_pages):
-        end_page = start_pages[index + 1] - 1 if index + 1 < len(start_pages) else page_count
-        page_parts = []
-        for page_number in range(start_page, end_page + 1):
-            page_text = extracted_pages[page_number - 1]
-            if page_text:
-                page_parts.append(f"[Page {page_number}]\n{page_text}")
+    for index, entry in enumerate(entries):
+        start_page, end_page = page_ranges[index]
         spine.append(ChapterContent(
-            id=page_hrefs[start_page],
-            href=page_hrefs[start_page],
-            title=page_titles[start_page],
+            id=entry.href,
+            href=entry.href,
+            title=entry.title,
             content="",
-            text="\n\n".join(page_parts),
+            text=section_texts[index],
             order=index,
             start_page=start_page,
             end_page=end_page,
-            media=[
-                image_path
-                for page_number in range(start_page, end_page + 1)
-                for image_path in extracted_images.get(page_number, [])
-            ],
-            media_captions={
-                image_path: extracted_captions[page_number][min(image_index, len(extracted_captions[page_number]) - 1)]
-                for page_number in range(start_page, end_page + 1)
-                if extracted_captions.get(page_number)
-                for image_index, image_path in enumerate(extracted_images.get(page_number, []))
-            },
+            media=section_media[index],
+            media_captions=section_captions[index],
         ))
 
     assets_dir = output_dir / "assets"

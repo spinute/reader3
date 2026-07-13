@@ -14,10 +14,12 @@ import reader3
 import server
 from importers import (
     DocumentImportError,
+    _PdfBookmark,
     _extract_pdf_captions,
     _extract_pdf_pages,
     _normalize_pdf_page_text,
     _sanitize_html,
+    _split_pdf_section_texts,
     _validate_public_url,
     import_file,
 )
@@ -41,6 +43,24 @@ def make_pdf(page_count=3, with_outline=False):
 
 
 class ImporterTests(unittest.TestCase):
+    def test_pdf_sections_split_multiple_headings_on_the_same_page(self):
+        entries = [
+            _PdfBookmark(title="1 Parent", page=1, href="parent"),
+            _PdfBookmark(title="1.1 Child", page=1, href="child"),
+            _PdfBookmark(title="2 Next", page=2, href="next"),
+        ]
+        texts, ranges = _split_pdf_section_texts(
+            ["1 Parent Parent introduction. 1.1 Child Child details only.", "2 Next Next body."],
+            entries,
+            2,
+        )
+
+        self.assertEqual(ranges, [(1, 1), (1, 1), (2, 2)])
+        self.assertIn("Parent introduction.", texts[0])
+        self.assertNotIn("Child details", texts[0])
+        self.assertIn("Child details only.", texts[1])
+        self.assertNotIn("Parent introduction", texts[1])
+
     def test_pdf_page_uses_ocr_when_embedded_text_is_missing(self):
         page = type("Page", (), {"extract_text": lambda self: ""})()
         reader = type("Reader", (), {"pages": [page]})()
@@ -111,6 +131,26 @@ class ImporterTests(unittest.TestCase):
             self.assertEqual([section.end_page for section in book.spine], [1, 2, 4])
             self.assertEqual(book.toc[0].title, "Chapter one")
             self.assertEqual(book.toc[0].children[0].title, "First topic")
+
+    def test_pdf_same_page_bookmarks_keep_distinct_toc_targets(self):
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        writer.add_blank_page(width=612, height=792)
+        parent = writer.add_outline_item("Parent", 0)
+        writer.add_outline_item("Child", 0, parent=parent)
+        payload = io.BytesIO()
+        writer.write(payload)
+
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root) / "same-page.pdf"
+            source.write_bytes(payload.getvalue())
+            book_id = import_file(source, root)
+            with (Path(root) / book_id / "book.pkl").open("rb") as handle:
+                book = pickle.load(handle)
+
+            self.assertEqual(len(book.spine), 2)
+            self.assertNotEqual(book.toc[0].file_href, book.toc[0].children[0].file_href)
+            self.assertEqual([section.start_page for section in book.spine], [1, 1])
 
     def test_pdf_without_outline_uses_page_ranges(self):
         with tempfile.TemporaryDirectory() as root:
@@ -206,6 +246,7 @@ class ServerTests(unittest.TestCase):
         context = context_response.json()
         self.assertIn("text", context)
         self.assertIn("markdown", context)
+        self.assertNotIn("## Page", context["markdown"])
         self.assertEqual(context["media"], [])
 
         chatgpt_response = self.client.get(
