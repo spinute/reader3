@@ -1,6 +1,8 @@
 import os
 import pickle
+import platform
 import re
+import subprocess
 import tempfile
 from functools import lru_cache
 from pathlib import Path
@@ -11,6 +13,7 @@ from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
+from pydantic import BaseModel, Field
 
 from importers import MAX_DOWNLOAD_BYTES, DocumentImportError, download_url, import_file
 from llm_providers import LLMChatRequest, LLMProviderError, call_llm, provider_status
@@ -21,7 +24,11 @@ templates = Jinja2Templates(directory="templates")
 
 # Where are the book folders located?
 BOOKS_DIR = "."
-AI_URL_MAX_CHARS = 7800
+AI_URL_MAX_ENCODED_CHARS = 6000
+AI_URL_TRUNCATION_NOTICE = (
+    "\n\n[Reader 3 shortened this URL prompt to avoid a browser 431 error. "
+    "Use Copy Markdown or an API-backed provider for the complete section.]"
+)
 AI_PROVIDER_URLS = {
     "chatgpt": "https://chatgpt.com/?q=",
     "claude": "https://claude.ai/new?q=",
@@ -32,6 +39,65 @@ PROMPT_ACTIONS = {
     "summary": "Summarize this section. List the central claims, important definitions, and the minimum details needed to recall it later. Preserve references to source pages.",
     "quiz": "Tutor me on this section using retrieval practice. Ask one question at a time, wait for my answer, then give feedback and continue. Do not reveal all answers immediately.",
 }
+
+
+class GeminiChromeRequest(BaseModel):
+    prompt: str = Field(min_length=1, max_length=120_000)
+
+
+def encode_ai_url_prompt(prompt: str) -> str:
+    """Encode a handoff prompt while bounding its actual URL-query size."""
+    encoded = quote(prompt, safe="")
+    if len(encoded) <= AI_URL_MAX_ENCODED_CHARS:
+        return encoded
+
+    low, high = 0, len(prompt)
+    while low < high:
+        middle = (low + high + 1) // 2
+        candidate = quote(prompt[:middle] + AI_URL_TRUNCATION_NOTICE, safe="")
+        if len(candidate) <= AI_URL_MAX_ENCODED_CHARS:
+            low = middle
+        else:
+            high = middle - 1
+    return quote(prompt[:low] + AI_URL_TRUNCATION_NOTICE, safe="")
+
+
+def run_gemini_chrome(prompt: str) -> None:
+    """Open Chrome's Ask Gemini panel, paste the prompt, and submit it on macOS."""
+    if platform.system() != "Darwin":
+        raise RuntimeError("Ask Gemini automation is available only on macOS")
+    script = r'''
+on run argv
+    set the clipboard to item 1 of argv
+    tell application "Google Chrome" to activate
+    delay 0.5
+    tell application "System Events"
+        keystroke "g" using control down
+        delay 1.2
+        keystroke "v" using command down
+        delay 0.2
+        key code 36
+    end tell
+    return "sent"
+end run
+'''
+    completed = subprocess.run(
+        ["osascript", "-e", script, prompt],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    if completed.returncode:
+        detail = (completed.stderr or completed.stdout).strip()
+        if "not allowed to send keystrokes" in detail:
+            raise RuntimeError(
+                "macOS blocked Chrome keyboard control. Enable Accessibility for the app "
+                "running reader3 in System Settings > Privacy & Security > Accessibility, "
+                "then retry. The prompt is already on the clipboard."
+            )
+        if detail:
+            raise RuntimeError(detail)
 
 
 def list_books():
@@ -187,6 +253,16 @@ async def llm_chat(payload: LLMChatRequest):
         raise HTTPException(status_code=500, detail="The LLM request failed") from exc
 
 
+@app.post("/api/gemini/chrome")
+async def ask_gemini_in_chrome(payload: GeminiChromeRequest):
+    """Invoke Chrome's native Ask Gemini UI from the local macOS reader."""
+    try:
+        await run_in_threadpool(run_gemini_chrome, payload.prompt)
+        return {"opened": True}
+    except (RuntimeError, subprocess.SubprocessError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.get("/open/{provider}/{book_id}/{chapter_index}")
 async def open_ai_chat(
     provider: str,
@@ -203,12 +279,7 @@ async def open_ai_chat(
     chapter = book.spine[chapter_index]
     selected_instruction = instruction.strip()[:2_000] or PROMPT_ACTIONS.get(action, PROMPT_ACTIONS["read"])
     full_prompt = f"{selected_instruction}\n\n{format_section_context(book, chapter)}"
-    if len(full_prompt) > AI_URL_MAX_CHARS:
-        full_prompt = (
-            f"{full_prompt[:AI_URL_MAX_CHARS]}\n\n"
-            "[Reader 3 truncated this URL prompt. Use Copy section for the complete text.]"
-        )
-    return RedirectResponse(provider_url + quote(full_prompt, safe=""), status_code=303)
+    return RedirectResponse(provider_url + encode_ai_url_prompt(full_prompt), status_code=303)
 
 @app.get("/read/{book_id}", response_class=HTMLResponse)
 async def redirect_to_first_chapter(request: Request, book_id: str):

@@ -199,6 +199,24 @@
         <div class="content-container asset image-viewer">
             <img src="/read/{{ book_id }}/asset" alt="{{ book.metadata.title }}">
         </div>
+        {% elif document_type in ["html", "url"] %}
+        <div class="view-switcher" aria-label="Document view">
+            <button id="html-mode-button" class="action-btn active" type="button" onclick="setViewMode('html')">HTML</button>
+            <button id="text-mode-button" class="action-btn" type="button" onclick="setViewMode('text')">Markdown</button>
+        </div>
+        <div id="html-view" class="content-container">
+            <div class="book-content">
+                {{ current_chapter.content | safe }}
+            </div>
+        </div>
+        <article id="text-view" class="text-view">
+            <div class="text-heading-row">
+                <h1 id="text-view-title"></h1>
+                <button class="copy-icon" type="button" title="Copy section as Markdown" onclick="copyCurrentSection()">⧉</button>
+            </div>
+            <div id="text-view-meta" class="text-meta"></div>
+            <div id="text-view-content" class="markdown-content text-loading">Loading extracted text…</div>
+        </article>
         {% else %}
         <div class="content-container">
             <div class="book-content">
@@ -229,8 +247,8 @@
 
     <aside id="settings-popover" aria-label="AI settings">
         <h2>AI settings</h2>
-        <label class="settings-field">Default LLM
-            <select id="llm-provider" onchange="providerSelectionChanged()">
+            <label class="settings-field">Default LLM
+                <select id="llm-provider" onchange="providerSelectionChanged()">
                 <option value="chatgpt-web">ChatGPT (web)</option>
                 <option value="claude-web">Claude (web)</option>
                 <option value="gemini-chrome">Ask Gemini in Chrome (⌃G)</option>
@@ -242,19 +260,19 @@
         </label>
         <div id="api-settings">
             <label class="settings-field">Model
-                <input id="llm-model" type="text" autocomplete="off" placeholder="Model name">
+                <input id="llm-model" type="text" autocomplete="off" placeholder="Model name" oninput="providerFieldChanged()">
             </label>
             <label id="base-url-field" class="settings-field">Base URL
-                <input id="llm-base-url" type="url" autocomplete="off" placeholder="http://127.0.0.1:11434/v1">
+                <input id="llm-base-url" type="url" autocomplete="off" placeholder="http://127.0.0.1:11434/v1" oninput="providerFieldChanged()">
             </label>
             <label id="api-token-field" class="settings-field">API token
-                <input id="llm-api-token" type="password" autocomplete="off" placeholder="Stored only in this browser">
+                <input id="llm-api-token" type="password" autocomplete="off" placeholder="Stored only in this browser" oninput="providerFieldChanged()">
             </label>
         </div>
         <p id="provider-status" class="settings-note"></p>
         <p class="settings-note">API tokens are stored in this browser and sent to the local reader3 server only for provider requests. They are never written to reader3's files.</p>
         <div class="settings-actions">
-            <button class="action-btn primary" type="button" onclick="saveSettings()">Save settings</button>
+            <button class="action-btn primary" type="button" onclick="toggleSettings(false)">Done</button>
         </div>
 
         <h3>Custom prompt button</h3>
@@ -354,12 +372,12 @@
         let chatState = loadJSON(chatStorageKey, freshChatState());
         if (!Array.isArray(chatState.sessions)) chatState = freshChatState();
 
-        function showStatus(message) {
+        function showStatus(message, duration = 2600) {
             const status = document.getElementById("copy-status");
             status.textContent = message;
             status.style.display = "block";
             window.clearTimeout(showStatus.timer);
-            showStatus.timer = window.setTimeout(() => status.style.display = "none", 2600);
+            showStatus.timer = window.setTimeout(() => status.style.display = "none", duration);
         }
 
         async function writeText(text, successMessage) {
@@ -504,15 +522,16 @@
         }
 
         function setViewMode(mode) {
-            if (documentType !== "pdf") return;
+            const sourceMode = documentType === "pdf" ? "pdf" : (["html", "url"].includes(documentType) ? "html" : "");
+            if (!sourceMode || ![sourceMode, "text"].includes(mode)) return;
             currentViewMode = mode;
             localStorage.setItem(viewStorageKey, mode);
-            document.getElementById("pdf-view").style.display = mode === "pdf" ? "block" : "none";
+            document.getElementById(`${sourceMode}-view`).style.display = mode === sourceMode ? "block" : "none";
             document.getElementById("text-view").style.display = mode === "text" ? "block" : "none";
-            document.getElementById("pdf-mode-button").classList.toggle("active", mode === "pdf");
+            document.getElementById(`${sourceMode}-mode-button`).classList.toggle("active", mode === sourceMode);
             document.getElementById("text-mode-button").classList.toggle("active", mode === "text");
             if (mode === "text") renderTextSection();
-            else showPdfPage(sectionData[currentChapterIndex]);
+            else if (sourceMode === "pdf") showPdfPage(sectionData[currentChapterIndex]);
         }
 
         async function copySectionByIndex(index) {
@@ -577,6 +596,8 @@
 
         function providerSelectionChanged() {
             const provider = document.getElementById("llm-provider").value;
+            llmSettings.provider = provider;
+            localStorage.setItem(settingsStorageKey, JSON.stringify(llmSettings));
             const isApi = apiProviders.has(provider);
             document.getElementById("api-settings").style.display = isApi ? "block" : "none";
             document.getElementById("base-url-field").style.display = provider === "openai-compatible" ? "block" : "none";
@@ -588,7 +609,7 @@
             document.getElementById("llm-api-token").value = llmSettings.tokens[provider] || "";
             const status = document.getElementById("provider-status");
             if (provider === "gemini-chrome") {
-                status.textContent = "Reader3 prepares and copies the prompt; press Control-G in Chrome and paste it into Ask Gemini.";
+                status.textContent = "Reader3 opens Chrome's Ask Gemini panel and submits the prompt automatically. macOS may request Accessibility permission the first time.";
             } else if (provider === "apple-foundation") {
                 const apple = providerAvailability.apple_foundation || {};
                 status.textContent = apple.available ? "Apple on-device model is available." : (apple.reason || "Checking Apple model availability…");
@@ -600,17 +621,14 @@
             updateChatProviderLabel();
         }
 
-        function saveSettings() {
+        function providerFieldChanged() {
             const provider = document.getElementById("llm-provider").value;
             llmSettings.provider = provider;
             llmSettings.models[provider] = document.getElementById("llm-model").value.trim();
             llmSettings.baseUrls[provider] = document.getElementById("llm-base-url").value.trim();
             llmSettings.tokens[provider] = document.getElementById("llm-api-token").value.trim();
             localStorage.setItem(settingsStorageKey, JSON.stringify(llmSettings));
-            renderCustomPrompts();
             updateChatProviderLabel();
-            toggleSettings(false);
-            showStatus(`${providerLabel()} selected`);
         }
 
         function renderCustomPrompts() {
@@ -686,7 +704,18 @@
             const fullPrompt = `${instruction}\n\n${payload.context}`;
             if (provider === "gemini-chrome") {
                 if (documentType === "pdf") setViewMode("text");
-                await writeText(fullPrompt, "Prompt copied — press ⌃G and paste into Ask Gemini");
+                showStatus("Opening Ask Gemini…");
+                const response = await fetch("/api/gemini/chrome", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({prompt: fullPrompt}),
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    showStatus(result.detail || "Ask Gemini could not be opened", 8000);
+                    return;
+                }
+                showStatus("Prompt sent to Ask Gemini");
                 return;
             }
             await sendPromptToPanel(label || action, fullPrompt);
@@ -891,8 +920,12 @@
         updateNavigation();
         enhanceStaticParagraphs();
         initializeAISettings();
+        if (["pdf", "html", "url"].includes(documentType)) {
+            const sourceMode = documentType === "pdf" ? "pdf" : "html";
+            const storedMode = localStorage.getItem(viewStorageKey);
+            setViewMode(storedMode === "text" ? "text" : sourceMode);
+        }
         if (documentType === "pdf") {
-            setViewMode(localStorage.getItem(viewStorageKey) || "pdf");
             window.addEventListener("popstate", event => {
                 const index = event.state?.chapterIndex;
                 if (Number.isInteger(index)) navigatePdfSection(index, false);

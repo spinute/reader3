@@ -40,12 +40,13 @@ Reader 3 keeps the source document visible while preparing each section as porta
 - **Copy selection** handles shorter excerpts from EPUB and HTML documents.
 - **Copy image** prepares standalone images for a multimodal LLM.
 - PDF headings navigate without reloading the whole reader page.
-- The in-page **PDF / Markdown** control switches between the original layout and heading-scoped extracted text with page labels and available raster figures.
-- Web handoff supports **ChatGPT**, **Claude**, and **Ask Gemini in Chrome**.
+- The in-page **PDF / Markdown** control switches between the original layout and heading-scoped extracted text with page labels and available raster figures. Imported HTML and URLs similarly provide an **HTML / Markdown** switch.
+- Web handoff supports **ChatGPT** and **Claude**. On macOS, **Ask Gemini in Chrome** activates Chrome, opens its native Ask Gemini panel, pastes the current prompt, and submits it through local accessibility automation.
 - API-backed chat supports OpenAI Responses, Anthropic Messages, OpenAI-compatible endpoints such as Ollama, and Apple's on-device Foundation Model SDK when the host supports it.
 - The right-side AI chat panel saves multiple chat histories in browser local storage.
+- Provider, model, endpoint, and token changes take effect immediately; **Done** only closes the settings panel.
 
-URL handoff is capped at 7,800 characters for browser compatibility. Chrome does not expose its privileged Ask Gemini panel to ordinary page JavaScript, so reader3 prepares and copies the prompt; press `Control-G` and paste it into Ask Gemini.
+URL handoff is capped by the encoded query size to avoid HTTP 431 errors. Long sections are shortened; use **Copy Markdown** or an API-backed provider when the complete section is required. Ask Gemini automation may require granting Accessibility permission to the terminal or app running reader3 the first time it is used.
 
 API tokens are stored only in the current browser's local storage and are sent through the localhost reader3 server for the selected provider request. They are not written to the document library. Apple Foundation Models currently require a supported Apple Silicon Mac and a compatible macOS/SDK; unavailable hosts show the reason in settings.
 

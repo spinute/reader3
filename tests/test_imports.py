@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
+from urllib.parse import unquote
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -238,6 +239,8 @@ class ServerTests(unittest.TestCase):
         self.assertIn('value="apple-foundation"', reader_response.text)
         self.assertIn('id="settings-popover"', reader_response.text)
         self.assertIn('id="chat-panel"', reader_response.text)
+        self.assertIn("providerFieldChanged()", reader_response.text)
+        self.assertNotIn("Save settings", reader_response.text)
         self.assertIn("runPromptAction('explain')", reader_response.text)
         self.assertIn("copyTocSection", reader_response.text)
         self.assertNotIn("gemini.google.com", reader_response.text)
@@ -289,6 +292,28 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(response.json()["message"], "A grounded answer")
         self.assertEqual(mocked_call.await_args.args[0].api_token, "test-token")
 
+    def test_ai_handoff_limits_encoded_query_size(self):
+        prompt = "Explain this section. " + ("A sentence with spaces & symbols. " * 2_000)
+        encoded = server.encode_ai_url_prompt(prompt)
+        self.assertLessEqual(len(encoded), server.AI_URL_MAX_ENCODED_CHARS)
+        self.assertIn("avoid a browser 431 error", unquote(encoded))
+
+    def test_ask_gemini_uses_local_chrome_automation(self):
+        with patch("server.run_gemini_chrome") as mocked_run:
+            response = self.client.post(
+                "/api/gemini/chrome",
+                json={"prompt": "Explain this section."},
+            )
+        self.assertEqual(response.status_code, 200)
+        mocked_run.assert_called_once_with("Explain this section.")
+
+    def test_gemini_ignores_empty_exit_error_after_submission(self):
+        completed = type("Completed", (), {"returncode": 1, "stderr": "", "stdout": ""})()
+        with patch("server.platform.system", return_value="Darwin"), patch(
+            "server.subprocess.run", return_value=completed
+        ):
+            server.run_gemini_chrome("Explain this section.")
+
     def test_library_contains_upload_controls(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
@@ -308,7 +333,11 @@ class ServerTests(unittest.TestCase):
                 follow_redirects=False,
             )
         self.assertEqual(response.status_code, 303)
-        self.assertEqual(self.client.get(response.headers["location"]).status_code, 200)
+        reader_response = self.client.get(response.headers["location"])
+        self.assertEqual(reader_response.status_code, 200)
+        self.assertIn('id="html-mode-button"', reader_response.text)
+        self.assertIn('id="text-mode-button"', reader_response.text)
+        self.assertIn('onclick="setViewMode(\'html\')"', reader_response.text)
         context_response = self.client.get(response.headers["location"].replace("/read/", "/api/read/") + "/context")
         self.assertEqual(context_response.status_code, 200)
         self.assertIn("Remote article", context_response.json()["context"])

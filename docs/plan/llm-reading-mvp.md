@@ -86,15 +86,17 @@ The browser handoff and reading-performance follow-up adds:
 - a fast Markdown-style mode alongside the original PDF, with page labels and extracted raster figures;
 - lazy section-text loading and caching;
 - synchronous URL-query handoff links for ChatGPT and Claude, avoiding popup-blocker failures;
-- an Ask Gemini action that prepares the current tab and displays Chrome's `Control-G` shortcut;
-- a 7,800-character URL limit with explicit truncation feedback.
+- a macOS Ask Gemini action that activates Chrome, opens its native panel, pastes the prompt, and submits it;
+- an encoded-query-size URL limit with explicit truncation feedback, avoiding HTTP 431 errors after percent encoding.
 
 The integrated AI follow-up adds:
 
 - a gear menu for selecting web, API, compatible/local, or Apple on-device providers;
+- immediate provider-setting persistence without a separate save step;
+- an HTML/Markdown view switch for imported HTML pages and URLs;
 - Explain, Summarize, Quiz, and custom prompt actions routed through the selected provider;
 - a right-side in-page chat panel with multiple locally saved chat histories;
 - per-section, per-paragraph, and TOC copy buttons;
 - a single structured **Copy Markdown** action instead of overlapping plain-section and Markdown actions.
 
-Configurable OCR, equation-to-LaTeX conversion, streaming AI responses, keychain credential storage, and automatic Gemini in Chrome side-panel activation remain deferred. Gemini in Chrome can read the current tab through Chrome's own UI, but regular web pages do not have a public API for opening that privileged side panel.
+Configurable OCR, equation-to-LaTeX conversion, streaming AI responses, and keychain credential storage remain deferred. Ask Gemini automation is macOS-specific and depends on local Accessibility permission because Chrome does not expose a public web API for its privileged side panel.
