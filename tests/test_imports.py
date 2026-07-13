@@ -245,6 +245,8 @@ class ServerTests(unittest.TestCase):
         self.assertIn('id="chat-panel"', reader_response.text)
         self.assertIn("providerFieldChanged()", reader_response.text)
         self.assertNotIn("Save settings", reader_response.text)
+        self.assertNotIn(">Done<", reader_response.text)
+        self.assertNotIn('id="provider-status"', reader_response.text)
         self.assertIn("runPromptAction('explain')", reader_response.text)
         self.assertIn("copyTocSection", reader_response.text)
         self.assertNotIn("gemini.google.com", reader_response.text)
@@ -326,8 +328,11 @@ class ServerTests(unittest.TestCase):
         ) as mocked_run:
             server.run_gemini_chrome("Explain this section.")
         script = mocked_run.call_args.args[0][2]
-        self.assertIn("repeat 50 times", script)
+        self.assertIn("on findGeminiPromptField()", script)
+        self.assertIn("repeat 40 times", script)
         self.assertIn('attribute "AXFocusedUIElement"', script)
+        self.assertIn('attribute "AXPlaceholderValue"', script)
+        self.assertIn('if promptField is missing value then', script)
         self.assertIn("key code 51", script)
         self.assertIn("if insertedValue is not promptText", script)
         self.assertIn("if promptSubmitted is false", script)

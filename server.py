@@ -67,6 +67,40 @@ def run_gemini_chrome(prompt: str) -> None:
     if platform.system() != "Darwin":
         raise RuntimeError("Ask Gemini automation is available only on macOS")
     script = r'''
+on findGeminiPromptField()
+    tell application "System Events"
+        tell process "Google Chrome"
+            try
+                set chromeElements to entire contents of front window
+                repeat with candidate in chromeElements
+                    try
+                        set candidateRole to value of attribute "AXRole" of candidate
+                        if candidateRole is in {"AXTextArea", "AXTextField", "AXComboBox"} then
+                            set markerText to ""
+                            try
+                                set markerText to value of attribute "AXPlaceholderValue" of candidate as text
+                            end try
+                            try
+                                set markerText to markerText & " " & (value of attribute "AXDescription" of candidate as text)
+                            end try
+                            try
+                                set markerText to markerText & " " & (value of attribute "AXHelp" of candidate as text)
+                            end try
+                            try
+                                set markerText to markerText & " " & (value of attribute "AXValue" of candidate as text)
+                            end try
+                            if markerText contains "Type / to use skills" or markerText contains "Ask Gemini" then
+                                return contents of candidate
+                            end if
+                        end if
+                    end try
+                end repeat
+            end try
+        end tell
+    end tell
+    return missing value
+end findGeminiPromptField
+
 on run argv
     set promptText to item 1 of argv
     set the clipboard to promptText
@@ -74,21 +108,30 @@ on run argv
     delay 0.1
     tell application "System Events"
         set frontmost of process "Google Chrome" to true
-        key code 5 using {control down}
-        set promptReady to false
-        repeat 50 times
+    end tell
+    set promptField to my findGeminiPromptField()
+    if promptField is missing value then
+        tell application "System Events" to key code 5 using {control down}
+        repeat 40 times
             delay 0.1
-            try
-                set focusedElement to value of attribute "AXFocusedUIElement" of process "Google Chrome"
-                set focusedRole to value of attribute "AXRole" of focusedElement
-                if focusedRole is in {"AXTextArea", "AXTextField", "AXComboBox"} then
-                    set promptReady to true
-                    exit repeat
-                end if
-            end try
+            set promptField to my findGeminiPromptField()
+            if promptField is not missing value then exit repeat
         end repeat
-        if promptReady is false then
-            error "Ask Gemini opened, but its prompt field did not receive focus."
+    end if
+    if promptField is missing value then
+        error "Ask Gemini's prompt field was not found."
+    end if
+    tell application "System Events"
+        try
+            set value of attribute "AXFocused" of promptField to true
+        end try
+        delay 0.05
+        set focusedElement to value of attribute "AXFocusedUIElement" of process "Google Chrome"
+        if focusedElement is not promptField then
+            try
+                perform action "AXPress" of promptField
+            end try
+            delay 0.05
         end if
         key code 0 using {command down}
         key code 51
@@ -107,7 +150,7 @@ on run argv
             delay 0.1
             try
                 set currentValue to value of attribute "AXValue" of focusedElement as text
-                if currentValue is "" then
+                if currentValue is "" or currentValue contains "Type / to use skills" then
                     set promptSubmitted to true
                     exit repeat
                 end if

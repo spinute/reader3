@@ -44,7 +44,7 @@ Reader 3 keeps the source document visible while preparing each section as porta
 - Web handoff supports **ChatGPT** and **Claude**. On macOS, **Ask Gemini in Chrome** activates Chrome, opens its native Ask Gemini panel, pastes the current prompt, and submits it through local accessibility automation.
 - API-backed chat supports OpenAI Responses, Anthropic Messages, OpenAI-compatible endpoints such as Ollama, and Apple's on-device Foundation Model SDK when the host supports it.
 - The right-side AI chat panel saves multiple chat histories in browser local storage.
-- Provider, model, endpoint, and token changes take effect immediately; **Done** only closes the settings panel.
+- Provider, model, endpoint, and token changes take effect immediately without a save or close button.
 
 URL handoff is capped by the encoded query size to avoid HTTP 431 errors. Long sections are shortened; use **Copy Markdown** or an API-backed provider when the complete section is required. Ask Gemini automation may require granting Accessibility permission to the terminal or app running reader3 the first time it is used.
 

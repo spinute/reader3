@@ -250,8 +250,7 @@
     </div>
 
     <aside id="settings-popover" aria-label="AI settings">
-        <h2>AI settings</h2>
-            <label class="settings-field">Default LLM
+        <label class="settings-field">Default LLM
                 <select id="llm-provider" onchange="providerSelectionChanged()">
                 <option value="chatgpt-web">ChatGPT (web)</option>
                 <option value="claude-web">Claude (web)</option>
@@ -273,12 +272,6 @@
                 <input id="llm-api-token" type="password" autocomplete="off" placeholder="Stored only in this browser" oninput="providerFieldChanged()">
             </label>
         </div>
-        <p id="provider-status" class="settings-note"></p>
-        <p class="settings-note">API tokens are stored in this browser and sent to the local reader3 server only for provider requests. They are never written to reader3's files.</p>
-        <div class="settings-actions">
-            <button class="action-btn primary" type="button" onclick="toggleSettings(false)">Done</button>
-        </div>
-
         <h3>Custom prompt button</h3>
         <label class="settings-field">Button label
             <input id="custom-prompt-name" type="text" maxlength="40" placeholder="e.g. Find assumptions">
@@ -611,17 +604,6 @@
             modelInput.disabled = provider === "apple-foundation";
             document.getElementById("llm-base-url").value = llmSettings.baseUrls[provider] || "";
             document.getElementById("llm-api-token").value = llmSettings.tokens[provider] || "";
-            const status = document.getElementById("provider-status");
-            if (provider === "gemini-chrome") {
-                status.textContent = "Reader3 opens Chrome's Ask Gemini panel and submits the prompt automatically. macOS may request Accessibility permission the first time.";
-            } else if (provider === "apple-foundation") {
-                const apple = providerAvailability.apple_foundation || {};
-                status.textContent = apple.available ? "Apple on-device model is available." : (apple.reason || "Checking Apple model availability…");
-            } else if (provider.endsWith("-web")) {
-                status.textContent = "Actions open a new provider tab with the current section.";
-            } else {
-                status.textContent = "Actions and chat run inside reader3's right-side panel.";
-            }
             updateChatProviderLabel();
         }
 
