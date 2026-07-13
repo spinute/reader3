@@ -9,9 +9,10 @@ from urllib.parse import quote
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from starlette.concurrency import run_in_threadpool
 
 from importers import MAX_DOWNLOAD_BYTES, DocumentImportError, download_url, import_file
-from reader3 import Book, BookMetadata, ChapterContent, TOCEntry
+from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, format_section_context
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -84,7 +85,7 @@ async def import_upload(file: UploadFile = File(...)):
                     if total > MAX_DOWNLOAD_BYTES:
                         raise DocumentImportError("Upload is larger than 100 MB")
                     output.write(chunk)
-            book_id = import_file(destination, BOOKS_DIR)
+            book_id = await run_in_threadpool(import_file, destination, BOOKS_DIR)
         load_book_cached.cache_clear()
         return RedirectResponse(url=f"/read/{book_id}/0", status_code=303)
     except DocumentImportError as exc:
@@ -101,8 +102,8 @@ async def import_url(url: str = Form(...)):
     """Download and import a public document or web page."""
     try:
         with tempfile.TemporaryDirectory(prefix="reader3-url-", dir=BOOKS_DIR) as temp_dir:
-            downloaded, final_url = download_url(url, temp_dir)
-            book_id = import_file(downloaded, BOOKS_DIR, source_url=final_url)
+            downloaded, final_url = await run_in_threadpool(download_url, url, temp_dir)
+            book_id = await run_in_threadpool(import_file, downloaded, BOOKS_DIR, final_url)
         load_book_cached.cache_clear()
         return RedirectResponse(url=f"/read/{book_id}/0", status_code=303)
     except DocumentImportError as exc:
@@ -110,6 +111,24 @@ async def import_url(url: str = Form(...)):
     except Exception as exc:
         print(f"URL import failed: {exc}")
         return _redirect_with("error", "Could not import that URL")
+
+
+@app.get("/api/read/{book_id}/{chapter_index}/context")
+async def section_context(book_id: str, chapter_index: int):
+    """Return portable LLM context for one document section."""
+    book = load_book_cached(book_id)
+    if not book or chapter_index < 0 or chapter_index >= len(book.spine):
+        raise HTTPException(status_code=404, detail="Section not found")
+    chapter = book.spine[chapter_index]
+    context = format_section_context(book, chapter)
+    return {
+        "document_title": book.metadata.title,
+        "section_title": chapter.title,
+        "start_page": getattr(chapter, "start_page", None),
+        "end_page": getattr(chapter, "end_page", None),
+        "character_count": len(chapter.text),
+        "context": context,
+    }
 
 @app.get("/read/{book_id}", response_class=HTMLResponse)
 async def redirect_to_first_chapter(book_id: str):

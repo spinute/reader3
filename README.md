@@ -24,6 +24,20 @@ uv run server.py
 
 Visit [localhost:8123](http://localhost:8123/), then upload a document or paste a public URL. Files and URL downloads are limited to 100 MB. Private and local network URLs are rejected.
 
+## Reading with an LLM
+
+Reader 3 keeps the source document visible while preparing each section as portable LLM context:
+
+- PDF bookmarks become a nested table of contents with page-range navigation.
+- Extractable PDF text is stored by section while the original PDF remains unchanged.
+- EPUB and HTML content use their existing section text.
+- **Copy section** includes the document title, section title, source pages, and text.
+- **Explain**, **Summarize**, and **Quiz me** copy a task-specific prompt with the section context.
+- **Copy selection** handles shorter excerpts from EPUB and HTML documents.
+- **Copy image** prepares standalone images for a multimodal LLM.
+
+Scanned PDFs need OCR before their text can be used as LLM context. See [`docs/plan/llm-reading-mvp.md`](docs/plan/llm-reading-mvp.md) for the implemented scope and deferred work.
+
 You can still import EPUB files from the command line. For example, download [Dracula EPUB3](https://www.gutenberg.org/ebooks/345) as `dracula.epub`, then:
 
 ```bash

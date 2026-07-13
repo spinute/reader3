@@ -7,12 +7,15 @@ import mimetypes
 import re
 import shutil
 import socket
+from collections import Counter
 from datetime import datetime
+from dataclasses import dataclass, field
 from pathlib import Path
 from urllib.parse import unquote, urljoin, urlparse
 
 import httpx
 from bs4 import BeautifulSoup, Comment
+from pypdf import PdfReader
 
 from reader3 import (
     Book,
@@ -25,12 +28,21 @@ from reader3 import (
 
 
 MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024
+PDF_FALLBACK_SECTION_PAGES = 10
 SUPPORTED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".avif"}
 SUPPORTED_EXTENSIONS = {".epub", ".pdf", ".html", ".htm", *SUPPORTED_IMAGE_EXTENSIONS}
 
 
 class DocumentImportError(ValueError):
     pass
+
+
+@dataclass
+class _PdfBookmark:
+    title: str
+    page: int
+    href: str
+    children: list["_PdfBookmark"] = field(default_factory=list)
 
 
 def _slugify(value: str) -> str:
@@ -78,6 +90,208 @@ def _asset_book(source: Path, output_dir: Path, document_type: str, source_url: 
         document_type=document_type,
         asset_filename=asset_name,
         source_url=source_url,
+    )
+
+
+def _pdf_outline(reader: PdfReader) -> list[_PdfBookmark]:
+    """Convert pypdf's alternating destination/list outline into a stable tree."""
+    counter = 0
+
+    def convert(items) -> list[_PdfBookmark]:
+        nonlocal counter
+        result: list[_PdfBookmark] = []
+        for item in items:
+            if isinstance(item, list):
+                if result:
+                    result[-1].children = convert(item)
+                continue
+            try:
+                page = reader.get_destination_page_number(item) + 1
+            except Exception:
+                continue
+            if page < 1 or page > len(reader.pages):
+                continue
+            title = " ".join(str(getattr(item, "title", "Untitled section")).split())
+            counter += 1
+            result.append(_PdfBookmark(title=title, page=page, href=f"pdf-section-{counter}"))
+        return result
+
+    try:
+        return convert(reader.outline)
+    except Exception:
+        return []
+
+
+def _flatten_bookmarks(bookmarks: list[_PdfBookmark]):
+    for bookmark in bookmarks:
+        yield bookmark
+        yield from _flatten_bookmarks(bookmark.children)
+
+
+def _bookmark_toc(bookmarks: list[_PdfBookmark], page_hrefs: dict[int, str]) -> list[TOCEntry]:
+    return [
+        TOCEntry(
+            title=bookmark.title,
+            href=page_hrefs[bookmark.page],
+            file_href=page_hrefs[bookmark.page],
+            anchor="",
+            children=_bookmark_toc(bookmark.children, page_hrefs),
+        )
+        for bookmark in bookmarks
+    ]
+
+
+def _normalize_pdf_page_text(text: str) -> str:
+    text = text.replace("\u00ad", "")
+    lines = text.splitlines()
+    lines = [
+        line for line in lines
+        if "© The Author(s)" not in line and "https://doi.org/" not in line
+    ]
+    if lines:
+        first = lines[0].strip()
+        if re.match(r"^\d+\s+\d+(?:\.\d+)*\.?(?:\s+[A-Z][A-Z .]+)?$", first):
+            lines.pop(0)
+            if lines and lines[0].strip().isupper():
+                lines.pop(0)
+        elif re.match(r"^\d+(?:\.\d+)+\.?\s+.+\s+\d+$", first):
+            lines.pop(0)
+        elif re.match(r"^.+\s+\d+$", first) and not first[:1].isdigit():
+            lines.pop(0)
+    text = "\n".join(lines)
+    text = re.sub(r"(?<=\S)Chapter\s+\d+", "", text)
+    text = re.sub(r"(?<=\w)-\s*\n\s*(?=\w)", "", text)
+    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for line in lines:
+        if line:
+            current.append(line)
+        elif current:
+            paragraphs.append(" ".join(current))
+            current = []
+    if current:
+        paragraphs.append(" ".join(current))
+    return "\n\n".join(paragraphs)
+
+
+def _extract_pdf_pages(reader: PdfReader) -> list[str]:
+    raw_pages: list[str] = []
+    for page in reader.pages:
+        try:
+            raw_pages.append(page.extract_text() or "")
+        except Exception:
+            raw_pages.append("")
+
+    def signature(line: str) -> str:
+        normalized = re.sub(r"\d+", "#", " ".join(line.lower().split()))
+        return normalized if 1 < len(normalized) < 160 else ""
+
+    edge_counts: Counter[str] = Counter()
+    page_lines = []
+    for text in raw_pages:
+        lines = [line.strip() for line in text.splitlines()]
+        page_lines.append(lines)
+        candidates = lines[:2] + lines[-2:]
+        edge_counts.update({signature(line) for line in candidates if signature(line)})
+    repeat_threshold = max(5, len(raw_pages) // 20)
+    repeated_edges = {key for key, count in edge_counts.items() if count >= repeat_threshold}
+
+    pages = []
+    for lines in page_lines:
+        last_index = len(lines) - 1
+        filtered = [
+            line for index, line in enumerate(lines)
+            if not ((index < 2 or index > last_index - 2) and signature(line) in repeated_edges)
+        ]
+        pages.append(_normalize_pdf_page_text("\n".join(filtered)))
+    return pages
+
+
+def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
+    reader = PdfReader(str(source))
+    if reader.is_encrypted:
+        try:
+            if not reader.decrypt(""):
+                raise DocumentImportError("Password-protected PDFs are not supported")
+        except Exception as exc:
+            if isinstance(exc, DocumentImportError):
+                raise
+            raise DocumentImportError("Password-protected PDFs are not supported") from exc
+
+    page_count = len(reader.pages)
+    if not page_count:
+        raise DocumentImportError("PDF contains no pages")
+    bookmarks = _pdf_outline(reader)
+    flat_bookmarks = list(_flatten_bookmarks(bookmarks))
+    page_titles: dict[int, str] = {}
+    for bookmark in flat_bookmarks:
+        page_titles.setdefault(bookmark.page, bookmark.title)
+
+    start_pages = sorted(page_titles)
+    if not start_pages:
+        start_pages = list(range(1, page_count + 1, PDF_FALLBACK_SECTION_PAGES))
+        page_titles = {
+            page: (
+                f"Pages {page}-{min(page + PDF_FALLBACK_SECTION_PAGES - 1, page_count)}"
+                if page < page_count
+                else f"Page {page}"
+            )
+            for page in start_pages
+        }
+    elif start_pages[0] > 1:
+        page_titles[1] = "Front matter"
+        start_pages.insert(0, 1)
+
+    page_hrefs = {page: f"pdf-page-{page}" for page in start_pages}
+    if bookmarks:
+        toc = _bookmark_toc(bookmarks, page_hrefs)
+        if start_pages[0] == 1 and not any(bookmark.page == 1 for bookmark in flat_bookmarks):
+            toc.insert(0, TOCEntry(title="Front matter", href=page_hrefs[1], file_href=page_hrefs[1], anchor=""))
+    else:
+        toc = [
+            TOCEntry(title=page_titles[page], href=page_hrefs[page], file_href=page_hrefs[page], anchor="")
+            for page in start_pages
+        ]
+
+    extracted_pages = _extract_pdf_pages(reader)
+    spine = []
+    for index, start_page in enumerate(start_pages):
+        end_page = start_pages[index + 1] - 1 if index + 1 < len(start_pages) else page_count
+        page_parts = []
+        for page_number in range(start_page, end_page + 1):
+            page_text = extracted_pages[page_number - 1]
+            if page_text:
+                page_parts.append(f"[Page {page_number}]\n{page_text}")
+        spine.append(ChapterContent(
+            id=page_hrefs[start_page],
+            href=page_hrefs[start_page],
+            title=page_titles[start_page],
+            content="",
+            text="\n\n".join(page_parts),
+            order=index,
+            start_page=start_page,
+            end_page=end_page,
+        ))
+
+    assets_dir = output_dir / "assets"
+    assets_dir.mkdir(parents=True, exist_ok=True)
+    asset_name = "document.pdf"
+    shutil.copy2(source, assets_dir / asset_name)
+    metadata = reader.metadata or {}
+    title = str(metadata.get("/Title") or source.stem.replace("_", " ")).strip()
+    author = str(metadata.get("/Author") or "").strip()
+    return Book(
+        metadata=BookMetadata(title=title or "Untitled", language="en", authors=[author] if author else []),
+        spine=spine,
+        toc=toc,
+        images={},
+        source_file=source.name,
+        processed_at=datetime.now().isoformat(),
+        document_type="pdf",
+        asset_filename=asset_name,
+        source_url=source_url,
+        page_count=page_count,
     )
 
 
@@ -169,7 +383,7 @@ def import_file(source_path: str | Path, output_root: str | Path = ".", source_u
             book.document_type = "epub"
             book.source_url = source_url
         elif extension == ".pdf":
-            book = _asset_book(source, output_dir, "pdf", source_url)
+            book = _pdf_book(source, output_dir, source_url)
         elif extension in SUPPORTED_IMAGE_EXTENSIONS:
             book = _asset_book(source, output_dir, "image", source_url)
         else:

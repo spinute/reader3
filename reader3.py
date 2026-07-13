@@ -28,6 +28,8 @@ class ChapterContent:
     content: str      # Cleaned HTML with rewritten image paths
     text: str         # Plain text for search/LLM context
     order: int        # Linear reading order
+    start_page: Optional[int] = None
+    end_page: Optional[int] = None
 
 
 @dataclass
@@ -68,6 +70,27 @@ class Book:
     document_type: str = "epub"
     asset_filename: Optional[str] = None
     source_url: Optional[str] = None
+    page_count: Optional[int] = None
+
+
+def format_section_context(book: Book, chapter: ChapterContent) -> str:
+    """Format a reader section as portable context for any LLM."""
+    lines = [
+        f"# {book.metadata.title}",
+        f"Section: {chapter.title}",
+    ]
+    authors = ", ".join(book.metadata.authors)
+    if authors:
+        lines.append(f"Authors: {authors}")
+    start_page = getattr(chapter, "start_page", None)
+    end_page = getattr(chapter, "end_page", None)
+    if start_page:
+        page_label = str(start_page) if not end_page or end_page == start_page else f"{start_page}-{end_page}"
+        lines.append(f"Source pages: {page_label}")
+    if book.source_file:
+        lines.append(f"Source file: {book.source_file}")
+    lines.extend(["", "---", "", chapter.text.strip()])
+    return "\n".join(lines).strip()
 
 
 # --- Utilities ---

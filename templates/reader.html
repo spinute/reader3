@@ -22,7 +22,19 @@
         a.toc-link.active { color: #d63384; font-weight: bold; }
 
         /* Main Content */
-        #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
+        #main { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        .reader-surface { flex: 1; min-height: 0; overflow-y: auto; position: relative; scroll-behavior: smooth; }
+        .reader-toolbar { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 8px 14px; border-bottom: 1px solid #e4e7eb; background: #fff; font-family: -apple-system, sans-serif; overflow-x: auto; }
+        .toolbar-title { min-width: 140px; margin-right: auto; }
+        .toolbar-title strong { display: block; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem; }
+        .toolbar-title span { display: block; color: #727b86; font-size: .72rem; margin-top: 2px; }
+        .action-btn { border: 1px solid #ccd2d9; border-radius: 6px; background: #fff; color: #35404b; cursor: pointer; padding: 7px 10px; white-space: nowrap; font: 600 .76rem -apple-system, sans-serif; }
+        .action-btn:hover { border-color: #2774d8; color: #175fb9; background: #f4f8fd; }
+        .action-btn.primary { color: #fff; border-color: #2774d8; background: #2774d8; }
+        .action-btn.primary:hover { background: #175fb9; }
+        .toolbar-nav { color: #2774d8; text-decoration: none; font: 700 1rem -apple-system, sans-serif; padding: 5px; }
+        .toolbar-nav.disabled { color: #bdc3ca; pointer-events: none; }
+        #copy-status { position: fixed; right: 20px; bottom: 20px; z-index: 10; display: none; padding: 10px 14px; border-radius: 7px; background: #20242a; color: white; font: .85rem -apple-system, sans-serif; box-shadow: 0 3px 14px rgba(0,0,0,.2); }
         .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; }
         .content-container.asset { max-width: none; height: 100%; padding: 0; }
         .pdf-viewer { display: block; width: 100%; height: 100%; border: 0; }
@@ -86,7 +98,7 @@
 
                        BETTER FIX: Use JavaScript to match filenames.
                     -->
-                    <a href="#" onclick="findAndGo('{{ item.file_href }}')"
+                    <a href="#" data-file="{{ item.file_href }}" onclick="findAndGo(this.dataset.file); return false"
                        class="toc-link {% if is_active %}active{% endif %}">
                         {{ item.title }}
                     </a>
@@ -104,9 +116,30 @@
 
     <!-- MAIN CONTENT -->
     <div id="main">
+        <div class="reader-toolbar">
+            {% if prev_idx is not none %}<a class="toolbar-nav" href="/read/{{ book_id }}/{{ prev_idx }}" title="Previous section">←</a>{% else %}<span class="toolbar-nav disabled">←</span>{% endif %}
+            {% if next_idx is not none %}<a class="toolbar-nav" href="/read/{{ book_id }}/{{ next_idx }}" title="Next section">→</a>{% else %}<span class="toolbar-nav disabled">→</span>{% endif %}
+            <div class="toolbar-title">
+                <strong>{{ current_chapter.title }}</strong>
+                <span>
+                    {% if current_chapter.start_page %}Pages {{ current_chapter.start_page }}{% if current_chapter.end_page and current_chapter.end_page != current_chapter.start_page %}-{{ current_chapter.end_page }}{% endif %} · {% endif %}
+                    {{ current_chapter.text|length }} characters
+                </span>
+            </div>
+            {% if document_type == "image" %}
+                <button class="action-btn primary" type="button" onclick="copyImage()">Copy image</button>
+            {% else %}
+                {% if document_type != "pdf" %}<button class="action-btn" type="button" onclick="copySelection()">Copy selection</button>{% endif %}
+                <button class="action-btn primary" type="button" onclick="copySection('plain')">Copy section</button>
+                <button class="action-btn" type="button" onclick="copySection('explain')">Explain</button>
+                <button class="action-btn" type="button" onclick="copySection('summary')">Summarize</button>
+                <button class="action-btn" type="button" onclick="copySection('quiz')">Quiz me</button>
+            {% endif %}
+        </div>
+        <div class="reader-surface">
         {% if document_type == "pdf" %}
         <div class="content-container asset">
-            <iframe class="pdf-viewer" src="/read/{{ book_id }}/asset" title="{{ book.metadata.title }}"></iframe>
+            <iframe class="pdf-viewer" src="/read/{{ book_id }}/asset#page={{ current_chapter.start_page or 1 }}" title="{{ book.metadata.title }}"></iframe>
         </div>
         {% elif document_type == "image" %}
         <div class="content-container asset image-viewer">
@@ -137,16 +170,20 @@
             </div>
         </div>
         {% endif %}
+        </div>
     </div>
+    <div id="copy-status" role="status" aria-live="polite"></div>
 
     <script>
         // Helper to map TOC filenames to Spine Indices
         // Pass the spine data from python to JS
         const spineMap = {
             {% for ch in book.spine %}
-            "{{ ch.href }}": {{ ch.order }},
+            {{ ch.href|tojson }}: {{ ch.order }},
             {% endfor %}
         };
+        const documentTitle = {{ book.metadata.title|tojson }};
+        const sectionTitle = {{ current_chapter.title|tojson }};
 
         function findAndGo(filename) {
             // The TOC usually has specific filenames e.g. "text/part001.html"
@@ -165,6 +202,73 @@
                 window.location.href = url;
             } else {
                 console.log("Could not find index for", filename);
+            }
+        }
+
+        const promptPrefixes = {
+            explain: "Explain this section clearly. Define unfamiliar terms, walk through important reasoning step by step, and preserve references to source pages.",
+            summary: "Summarize this section. List the central claims, important definitions, and the minimum details needed to recall it later. Preserve references to source pages.",
+            quiz: "Tutor me on this section using retrieval practice. Ask one question at a time, wait for my answer, then give feedback and continue. Do not reveal all answers immediately.",
+        };
+
+        function showStatus(message) {
+            const status = document.getElementById("copy-status");
+            status.textContent = message;
+            status.style.display = "block";
+            window.clearTimeout(showStatus.timer);
+            showStatus.timer = window.setTimeout(() => status.style.display = "none", 2200);
+        }
+
+        async function writeText(text, successMessage) {
+            await navigator.clipboard.writeText(text);
+            showStatus(successMessage);
+        }
+
+        async function copySection(mode) {
+            try {
+                const response = await fetch("/api/read/{{ book_id }}/{{ chapter_index }}/context");
+                if (!response.ok) throw new Error("Context is unavailable");
+                const payload = await response.json();
+                if (!payload.character_count) {
+                    showStatus("No extractable text in this section");
+                    return;
+                }
+                const prefix = promptPrefixes[mode];
+                const output = prefix ? `${prefix}\n\n${payload.context}` : payload.context;
+                await writeText(output, prefix ? "Prompt and section copied" : "Section copied");
+            } catch (error) {
+                showStatus(error.message || "Copy failed");
+            }
+        }
+
+        async function copySelection() {
+            const selection = window.getSelection().toString().trim();
+            if (!selection) {
+                showStatus("Select some text first");
+                return;
+            }
+            const header = `# ${documentTitle}\nSection: ${sectionTitle}\n\n---\n\n`;
+            try {
+                await writeText(header + selection, "Selection copied");
+            } catch (error) {
+                showStatus("Copy failed");
+            }
+        }
+
+        async function copyImage() {
+            try {
+                const response = await fetch("/read/{{ book_id }}/asset");
+                const sourceBlob = await response.blob();
+                const image = await createImageBitmap(sourceBlob);
+                const canvas = document.createElement("canvas");
+                canvas.width = image.width;
+                canvas.height = image.height;
+                canvas.getContext("2d").drawImage(image, 0, 0);
+                const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+                await navigator.clipboard.write([new ClipboardItem({"image/png": pngBlob})]);
+                showStatus("Image copied");
+            } catch (error) {
+                showStatus("This browser could not copy the image");
             }
         }
     </script>
