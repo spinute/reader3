@@ -70,13 +70,28 @@ def run_gemini_chrome(prompt: str) -> None:
 on run argv
     set the clipboard to item 1 of argv
     tell application "Google Chrome" to activate
-    delay 1.0
+    delay 0.1
     tell application "System Events"
         set frontmost of process "Google Chrome" to true
         key code 5 using {control down}
-        delay 2.0
+        set promptReady to false
+        repeat 50 times
+            delay 0.1
+            try
+                set focusedElement to value of attribute "AXFocusedUIElement" of process "Google Chrome"
+                set focusedRole to value of attribute "AXRole" of focusedElement
+                if focusedRole is in {"AXTextArea", "AXTextField", "AXComboBox"} then
+                    set promptReady to true
+                    exit repeat
+                end if
+            end try
+        end repeat
+        if promptReady is false then
+            error "Ask Gemini opened, but its prompt field did not receive focus."
+        end if
+        key code 0 using {command down}
         key code 9 using {command down}
-        delay 0.4
+        delay 0.15
         key code 36
     end tell
     return "sent"

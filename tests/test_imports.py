@@ -319,6 +319,17 @@ class ServerTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "exited with status 1"):
                 server.run_gemini_chrome("Explain this section.")
 
+    def test_gemini_waits_for_prompt_focus_instead_of_fixed_delay(self):
+        completed = type("Completed", (), {"returncode": 0, "stderr": "", "stdout": "sent"})()
+        with patch("server.platform.system", return_value="Darwin"), patch(
+            "server.subprocess.run", return_value=completed
+        ) as mocked_run:
+            server.run_gemini_chrome("Explain this section.")
+        script = mocked_run.call_args.args[0][2]
+        self.assertIn("repeat 50 times", script)
+        self.assertIn('attribute "AXFocusedUIElement"', script)
+        self.assertNotIn("delay 2.0", script)
+
     def test_library_contains_upload_controls(self):
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
