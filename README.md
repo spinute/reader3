@@ -42,7 +42,7 @@ Reader 3 keeps the source document visible while preparing each section as porta
 - Web handoff supports **ChatGPT** and **Claude**.
 - API-backed chat supports OpenAI Responses, Anthropic Messages, Google Gemini, OpenAI-compatible endpoints such as Ollama, and Apple's on-device Foundation Model SDK when the host supports it.
 - The persistent right-side Assistant panel saves multiple chat histories in browser local storage and uses smooth message/Thinking transitions.
-- **My page** stores global API tokens, provider model names, compatible endpoints, and custom prompt buttons. The reader toolbar only switches the active model.
+- **My page** stores global API tokens, provider model names, compatible endpoints, response preferences, and custom prompt buttons. A response preference such as `Always answer in Japanese.` applies to every chat and prompt action. The reader toolbar only switches the active model.
 
 URL handoff is capped by the encoded query size to avoid HTTP 431 errors. Long sections are shortened; use a section copy icon or an API-backed provider when the complete section is required.
 

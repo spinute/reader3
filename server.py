@@ -221,6 +221,7 @@ async def open_ai_chat(
     chapter_index: int,
     action: str = "read",
     instruction: str = "",
+    preferences: str = "",
 ):
     """Open a supported AI chat from a normal browser link (popup-safe)."""
     provider_url = AI_PROVIDER_URLS.get(provider)
@@ -229,6 +230,9 @@ async def open_ai_chat(
         raise HTTPException(status_code=404, detail="AI handoff not found")
     chapter = book.spine[chapter_index]
     selected_instruction = instruction.strip()[:2_000] or PROMPT_ACTIONS.get(action, PROMPT_ACTIONS["read"])
+    response_preferences = preferences.strip()[:4_000]
+    if response_preferences:
+        selected_instruction += f"\n\nUser response preferences:\n{response_preferences}"
     full_prompt = f"{selected_instruction}\n\n{format_section_context(book, chapter)}"
     return RedirectResponse(provider_url + encode_ai_url_prompt(full_prompt), status_code=303)
 

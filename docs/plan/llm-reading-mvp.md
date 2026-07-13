@@ -89,7 +89,7 @@ The browser handoff and reading-performance follow-up adds:
 
 The integrated AI follow-up adds:
 
-- a global My page for API tokens, provider models/endpoints, and custom prompts;
+- a global My page for API tokens, provider models/endpoints, global response preferences (language, tone, and format), and custom prompt buttons;
 - a model-only selector in the reader toolbar;
 - an HTML/Markdown view switch for imported HTML pages and URLs;
 - Explain, Summarize, Quiz, and custom prompt actions routed through the selected provider;

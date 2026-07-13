@@ -327,6 +327,7 @@
                 },
                 tokens: {openai: "", anthropic: "", google: "", "openai-compatible": ""},
                 baseUrls: {"openai-compatible": "http://127.0.0.1:11434/v1"},
+                responseInstructions: "",
                 customPrompts: [],
             };
         }
@@ -586,9 +587,13 @@
             if (!instruction) return;
             if (provider === "chatgpt-web" || provider === "claude-web") {
                 const target = provider === "chatgpt-web" ? "chatgpt" : "claude";
-                const params = customInstruction
+                const actionParam = customInstruction
                     ? `instruction=${encodeURIComponent(customInstruction)}`
                     : `action=${encodeURIComponent(action)}`;
+                const preferences = llmSettings.responseInstructions
+                    ? `&preferences=${encodeURIComponent(llmSettings.responseInstructions)}`
+                    : "";
+                const params = actionParam + preferences;
                 const opened = window.open(`/open/${target}/${bookId}/${currentChapterIndex}?${params}`, "_blank", "noopener");
                 if (!opened) showStatus("Allow pop-ups to open the selected LLM");
                 return;
@@ -696,6 +701,8 @@
 
         async function callConfiguredLLM(session) {
             const provider = llmSettings.provider;
+            const baseInstructions = "You are a thoughtful reading assistant. Answer using the supplied document context, cite source pages when available, and say when the source does not support a claim.";
+            const responseInstructions = (llmSettings.responseInstructions || "").trim();
             const response = await fetch("/api/llm/chat", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
@@ -704,7 +711,9 @@
                     model: llmSettings.models[provider] || "",
                     api_token: llmSettings.tokens[provider] || "",
                     base_url: llmSettings.baseUrls[provider] || "",
-                    instructions: "You are a thoughtful reading assistant. Answer using the supplied document context, cite source pages when available, and say when the source does not support a claim.",
+                    instructions: responseInstructions
+                        ? `${baseInstructions}\n\nUser response preferences:\n${responseInstructions}`
+                        : baseInstructions,
                     messages: session.messages.map(({role, content}) => ({role, content})),
                 }),
             });

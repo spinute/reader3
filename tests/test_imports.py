@@ -267,10 +267,13 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(context["media"], [])
 
         chatgpt_response = self.client.get(
-            f"/open/chatgpt/{book_id}/0", follow_redirects=False
+            f"/open/chatgpt/{book_id}/0",
+            params={"preferences": "常に日本語で回答してください。"},
+            follow_redirects=False,
         )
         self.assertEqual(chatgpt_response.status_code, 303)
         self.assertTrue(chatgpt_response.headers["location"].startswith("https://chatgpt.com/?q="))
+        self.assertIn("常に日本語で回答してください。", unquote(chatgpt_response.headers["location"]))
 
         claude_response = self.client.get(
             f"/open/claude/{book_id}/0", follow_redirects=False
@@ -312,6 +315,8 @@ class ServerTests(unittest.TestCase):
         self.assertIn('id="openai-token"', response.text)
         self.assertIn('id="google-token"', response.text)
         self.assertIn('id="compatible-url"', response.text)
+        self.assertIn('id="response-instructions"', response.text)
+        self.assertIn('responseInstructions: ""', response.text)
         self.assertIn('id="prompt-list"', response.text)
 
     def test_library_contains_upload_controls(self):

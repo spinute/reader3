@@ -78,6 +78,14 @@
         </section>
         <p class="note">Tokens stay in this browser's local storage and are sent only to the local Reader 3 server when you make a request.</p>
 
+        <div class="section-title">Response preferences</div>
+        <section class="card">
+            <label>Instructions applied to every AI request
+                <textarea id="response-instructions" maxlength="4000" placeholder="Always answer in Japanese."></textarea>
+            </label>
+            <p class="note">Use this for language, tone, answer format, or other preferences. Changes are saved automatically.</p>
+        </section>
+
         <div class="section-title">Custom prompt buttons</div>
         <section class="card">
             <div class="prompt-form">
@@ -101,6 +109,7 @@
             },
             tokens: {openai: "", anthropic: "", google: "", "openai-compatible": ""},
             baseUrls: {"openai-compatible": "http://127.0.0.1:11434/v1"},
+            responseInstructions: "",
             customPrompts: [],
         };
         function loadSettings() {
@@ -136,6 +145,12 @@
             input.value = settings[group][key] || "";
             input.addEventListener("input", () => { settings[group][key] = input.value.trim(); persist(); });
         }
+        const responseInstructions = document.getElementById("response-instructions");
+        responseInstructions.value = settings.responseInstructions || "";
+        responseInstructions.addEventListener("input", () => {
+            settings.responseInstructions = responseInstructions.value.trim();
+            persist();
+        });
         function renderPrompts() {
             const list = document.getElementById("prompt-list");
             list.replaceChildren();
