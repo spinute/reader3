@@ -21,7 +21,10 @@ templates = Jinja2Templates(directory="templates")
 
 # Where are the book folders located?
 BOOKS_DIR = "."
-AI_URL_MAX_ENCODED_CHARS = 6000
+# Keep the complete handoff URL below the conservative 2 KB interoperability
+# boundary. ChatGPT may reject longer GET requests with HTTP 431, especially
+# once browser cookies and other request headers are included.
+AI_URL_MAX_ENCODED_CHARS = 1800
 AI_URL_TRUNCATION_NOTICE = (
     "\n\n[Reader 3 shortened this URL prompt to avoid a browser 431 error. "
     "Use the section copy icon or an API-backed provider for the complete section.]"

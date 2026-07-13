@@ -273,6 +273,7 @@ class ServerTests(unittest.TestCase):
         )
         self.assertEqual(chatgpt_response.status_code, 303)
         self.assertTrue(chatgpt_response.headers["location"].startswith("https://chatgpt.com/?q="))
+        self.assertLess(len(chatgpt_response.headers["location"].encode()), 2_048)
         self.assertIn("常に日本語で回答してください。", unquote(chatgpt_response.headers["location"]))
 
         claude_response = self.client.get(

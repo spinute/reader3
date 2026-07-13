@@ -85,7 +85,7 @@ The browser handoff and reading-performance follow-up adds:
 - a fast Markdown-style mode alongside the original PDF, with page labels and extracted raster figures;
 - lazy section-text loading and caching;
 - synchronous URL-query handoff links for ChatGPT and Claude, avoiding popup-blocker failures;
-- an encoded-query-size URL limit with explicit truncation feedback, avoiding HTTP 431 errors after percent encoding.
+- a conservative sub-2-KB encoded URL limit with explicit truncation feedback, avoiding HTTP 431 errors after percent encoding.
 
 The integrated AI follow-up adds:
 

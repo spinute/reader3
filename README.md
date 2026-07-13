@@ -44,7 +44,7 @@ Reader 3 keeps the source document visible while preparing each section as porta
 - The persistent right-side Assistant panel saves multiple chat histories in browser local storage and uses smooth message/Thinking transitions.
 - **My page** stores global API tokens, provider model names, compatible endpoints, response preferences, and custom prompt buttons. A response preference such as `Always answer in Japanese.` applies to every chat and prompt action. The reader toolbar only switches the active model.
 
-URL handoff is capped by the encoded query size to avoid HTTP 431 errors. Long sections are shortened; use a section copy icon or an API-backed provider when the complete section is required.
+URL handoff is kept below 2 KB to avoid HTTP 431 errors from ChatGPT and other web providers. Long sections are shortened; use a section copy icon or an API-backed provider when the complete section is required.
 
 API tokens are stored only in the current browser's local storage and are sent through the localhost reader3 server for the selected provider request. They are not written to the document library. Apple Foundation Models currently require a supported Apple Silicon Mac and a compatible macOS/SDK; unavailable hosts show the reason on My page.
 
