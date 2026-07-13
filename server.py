@@ -90,28 +90,37 @@ on run argv
         if promptReady is false then
             error "Ask Gemini opened, but its prompt field did not receive focus."
         end if
-        set promptInserted to false
+        key code 0 using {command down}
+        key code 51
+        key code 9 using {command down}
+        delay 0.25
+        set insertedValue to ""
         try
-            set value of attribute "AXValue" of focusedElement to promptText
-            delay 0.1
             set insertedValue to value of attribute "AXValue" of focusedElement as text
-            if (count characters of insertedValue) > 0 then set promptInserted to true
         end try
-        if promptInserted is false then
-            key code 0 using {command down}
-            key code 9 using {command down}
-            delay 0.25
-            try
-                set insertedValue to value of attribute "AXValue" of focusedElement as text
-                if (count characters of insertedValue) > 0 then set promptInserted to true
-            end try
-        end if
-        if promptInserted is false then
-            error "Ask Gemini opened, but reader3 could not insert the prompt. The prompt remains on the clipboard."
+        if insertedValue is not promptText then
+            error "Ask Gemini opened, but the inserted text did not match the prompt. The prompt remains on the clipboard."
         end if
         key code 36
+        set promptSubmitted to false
+        repeat 30 times
+            delay 0.1
+            try
+                set currentValue to value of attribute "AXValue" of focusedElement as text
+                if currentValue is "" then
+                    set promptSubmitted to true
+                    exit repeat
+                end if
+            on error
+                set promptSubmitted to true
+                exit repeat
+            end try
+        end repeat
+        if promptSubmitted is false then
+            error "The prompt was inserted, but reader3 could not confirm that Ask Gemini submitted it."
+        end if
     end tell
-    return "sent " & (count characters of insertedValue)
+    return "submitted " & (count characters of insertedValue)
 end run
 '''
     completed = subprocess.run(
