@@ -68,7 +68,8 @@ def run_gemini_chrome(prompt: str) -> None:
         raise RuntimeError("Ask Gemini automation is available only on macOS")
     script = r'''
 on run argv
-    set the clipboard to item 1 of argv
+    set promptText to item 1 of argv
+    set the clipboard to promptText
     tell application "Google Chrome" to activate
     delay 0.1
     tell application "System Events"
@@ -89,12 +90,28 @@ on run argv
         if promptReady is false then
             error "Ask Gemini opened, but its prompt field did not receive focus."
         end if
-        key code 0 using {command down}
-        key code 9 using {command down}
-        delay 0.15
+        set promptInserted to false
+        try
+            set value of attribute "AXValue" of focusedElement to promptText
+            delay 0.1
+            set insertedValue to value of attribute "AXValue" of focusedElement as text
+            if (count characters of insertedValue) > 0 then set promptInserted to true
+        end try
+        if promptInserted is false then
+            key code 0 using {command down}
+            key code 9 using {command down}
+            delay 0.25
+            try
+                set insertedValue to value of attribute "AXValue" of focusedElement as text
+                if (count characters of insertedValue) > 0 then set promptInserted to true
+            end try
+        end if
+        if promptInserted is false then
+            error "Ask Gemini opened, but reader3 could not insert the prompt. The prompt remains on the clipboard."
+        end if
         key code 36
     end tell
-    return "sent"
+    return "sent " & (count characters of insertedValue)
 end run
 '''
     completed = subprocess.run(

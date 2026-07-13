@@ -328,6 +328,8 @@ class ServerTests(unittest.TestCase):
         script = mocked_run.call_args.args[0][2]
         self.assertIn("repeat 50 times", script)
         self.assertIn('attribute "AXFocusedUIElement"', script)
+        self.assertIn('set value of attribute "AXValue"', script)
+        self.assertIn("if promptInserted is false", script)
         self.assertNotIn("delay 2.0", script)
 
     def test_library_contains_upload_controls(self):
