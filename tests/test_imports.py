@@ -4,7 +4,7 @@ import pickle
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 from PIL import Image
@@ -232,12 +232,19 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(reader_response.status_code, 200)
         self.assertIn('id="text-mode-button"', reader_response.text)
         self.assertIn("navigatePdfSection", reader_response.text)
-        self.assertIn('href="/open/chatgpt/', reader_response.text)
-        self.assertIn('href="/open/claude/', reader_response.text)
-        self.assertIn("Ask Gemini (⌃G)", reader_response.text)
+        self.assertIn('value="chatgpt-web"', reader_response.text)
+        self.assertIn('value="claude-web"', reader_response.text)
+        self.assertIn('value="gemini-chrome"', reader_response.text)
+        self.assertIn('value="apple-foundation"', reader_response.text)
+        self.assertIn('id="settings-popover"', reader_response.text)
+        self.assertIn('id="chat-panel"', reader_response.text)
+        self.assertIn("runPromptAction('explain')", reader_response.text)
+        self.assertIn("copyTocSection", reader_response.text)
         self.assertNotIn("gemini.google.com", reader_response.text)
         self.assertIn("frame.replaceWith(nextFrame)", reader_response.text)
         book_id = reader_url.split("/")[2]
+        first_section_response = self.client.get(f"/read/{book_id}")
+        self.assertEqual(first_section_response.status_code, 200)
         asset_response = self.client.get(f"/read/{book_id}/asset")
         self.assertEqual(asset_response.status_code, 200)
         self.assertEqual(asset_response.content, payload)
@@ -260,6 +267,27 @@ class ServerTests(unittest.TestCase):
         )
         self.assertEqual(claude_response.status_code, 303)
         self.assertTrue(claude_response.headers["location"].startswith("https://claude.ai/new?q="))
+
+    def test_llm_status_and_in_page_chat_api(self):
+        status_response = self.client.get("/api/llm/status")
+        self.assertEqual(status_response.status_code, 200)
+        self.assertIn("apple_foundation", status_response.json())
+
+        mocked_call = AsyncMock(return_value="A grounded answer")
+        with patch("server.call_llm", mocked_call):
+            response = self.client.post(
+                "/api/llm/chat",
+                json={
+                    "provider": "openai",
+                    "model": "gpt-5",
+                    "api_token": "test-token",
+                    "instructions": "Use the supplied text.",
+                    "messages": [{"role": "user", "content": "Explain this."}],
+                },
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "A grounded answer")
+        self.assertEqual(mocked_call.await_args.args[0].api_token, "test-token")
 
     def test_library_contains_upload_controls(self):
         response = self.client.get("/")

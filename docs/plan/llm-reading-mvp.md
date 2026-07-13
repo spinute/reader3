@@ -4,7 +4,7 @@
 
 Make every reader3 document useful for Karpathy-style reading: preserve the source for reading, expose meaningful sections, and make the current section easy to send to any LLM with enough source context to discuss it accurately.
 
-## Current gaps
+## Initial gaps (addressed)
 
 - PDF input is a single embedded asset with no reader3 table of contents.
 - PDF text and page ranges are not extracted.
@@ -42,11 +42,14 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 - Add actions for:
   - copying the current section with title and source location;
   - copying the user's current text selection;
-  - copying an explanation prompt plus the section;
-  - copying a summary prompt plus the section;
-  - copying a comprehension-quiz prompt plus the section;
+  - running an explanation prompt with the selected LLM;
+  - running a summary prompt with the selected LLM;
+  - running a comprehension-quiz prompt with the selected LLM;
   - copying an image document for a multimodal LLM.
-- Keep provider integration out of the MVP: clipboard output works with ChatGPT, Claude, local models, and future providers without credentials.
+- Keep web handoff available for ChatGPT, Claude, and Ask Gemini in Chrome.
+- Add a provider-neutral in-page chat API for OpenAI, Anthropic, OpenAI-compatible endpoints, and Apple Foundation Models.
+- Store provider choice, custom prompt buttons, and chat histories in browser local storage.
+- Keep API tokens out of reader3 files and use them only for the selected request.
 
 ### 4. Safety and limits
 
@@ -72,7 +75,7 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 - Configurable OCR languages and extracting text from standalone images (English Tesseract fallback is implemented for image-only PDF pages).
 - Equation-to-LaTeX conversion.
 - Semantic figure/caption association and multimodal section bundles (raster figures are already extracted by page).
-- Authenticated provider APIs for ChatGPT, Claude, Apple Foundation Models, or Ollama.
+- Streaming responses, token usage/cost display, and encrypted OS-keychain credential storage.
 - Search, notes, highlights, reading-position sync, and retrieval across multiple sections.
 
 ## Follow-up implementation
@@ -80,10 +83,18 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 The browser handoff and reading-performance follow-up adds:
 
 - in-page PDF section navigation without a full reader-page reload;
-- a fast Markdown-style mode alongside the original PDF, with page headings and extracted raster figures;
+- a fast Markdown-style mode alongside the original PDF, with page labels and extracted raster figures;
 - lazy section-text loading and caching;
 - synchronous URL-query handoff links for ChatGPT and Claude, avoiding popup-blocker failures;
 - an Ask Gemini action that prepares the current tab and displays Chrome's `Control-G` shortcut;
 - a 7,800-character URL limit with explicit truncation feedback.
 
-Direct provider APIs, authenticated conversations, configurable OCR, equation-to-LaTeX conversion, and automatic Gemini in Chrome side-panel activation remain deferred. Gemini in Chrome can read the current tab through Chrome's own UI, but regular web pages do not have a public API for opening that privileged side panel.
+The integrated AI follow-up adds:
+
+- a gear menu for selecting web, API, compatible/local, or Apple on-device providers;
+- Explain, Summarize, Quiz, and custom prompt actions routed through the selected provider;
+- a right-side in-page chat panel with multiple locally saved chat histories;
+- per-section, per-paragraph, and TOC copy buttons;
+- a single structured **Copy Markdown** action instead of overlapping plain-section and Markdown actions.
+
+Configurable OCR, equation-to-LaTeX conversion, streaming AI responses, keychain credential storage, and automatic Gemini in Chrome side-panel activation remain deferred. Gemini in Chrome can read the current tab through Chrome's own UI, but regular web pages do not have a public API for opening that privileged side panel.

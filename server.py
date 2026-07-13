@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
 
 from importers import MAX_DOWNLOAD_BYTES, DocumentImportError, download_url, import_file
+from llm_providers import LLMChatRequest, LLMProviderError, call_llm, provider_status
 from reader3 import Book, BookMetadata, ChapterContent, TOCEntry, format_section_context
 
 app = FastAPI()
@@ -24,6 +25,12 @@ AI_URL_MAX_CHARS = 7800
 AI_PROVIDER_URLS = {
     "chatgpt": "https://chatgpt.com/?q=",
     "claude": "https://claude.ai/new?q=",
+}
+PROMPT_ACTIONS = {
+    "read": "Read this section with me. Start by explaining its main idea, then invite me to ask questions. Cite source pages when available.",
+    "explain": "Explain this section clearly. Define unfamiliar terms, walk through important reasoning step by step, and preserve references to source pages.",
+    "summary": "Summarize this section. List the central claims, important definitions, and the minimum details needed to recall it later. Preserve references to source pages.",
+    "quiz": "Tutor me on this section using retrieval practice. Ask one question at a time, wait for my answer, then give feedback and continue. Do not reveal all answers immediately.",
 }
 
 
@@ -137,7 +144,13 @@ async def section_context(book_id: str, chapter_index: int):
             "alt": caption or (f"Extracted figure from page {match.group(1)}" if match else "Extracted figure"),
         })
     markdown = re.sub(r"^\[Page (\d+)\]$", r"_Page \1_", chapter.text, flags=re.MULTILINE)
-    markdown = f"# {chapter.title}\n\n{markdown}".strip()
+    source_bits = [book.metadata.title]
+    if getattr(chapter, "start_page", None):
+        page_range = str(chapter.start_page)
+        if chapter.end_page and chapter.end_page != chapter.start_page:
+            page_range += f"-{chapter.end_page}"
+        source_bits.append(f"source pages {page_range}")
+    markdown = f"# {chapter.title}\n\n> {' · '.join(source_bits)}\n\n{markdown}".strip()
     if media:
         markdown += "\n\n## Extracted images\n\n" + "\n\n".join(
             f"![{item['alt']}]({item['url']})" for item in media
@@ -155,19 +168,41 @@ async def section_context(book_id: str, chapter_index: int):
     }
 
 
+@app.get("/api/llm/status")
+async def llm_status():
+    """Report local provider availability without exposing credentials."""
+    return provider_status()
+
+
+@app.post("/api/llm/chat")
+async def llm_chat(payload: LLMChatRequest):
+    """Call the selected API/local model; tokens are used for this request only."""
+    try:
+        response = await call_llm(payload)
+        return {"message": response, "provider": payload.provider, "model": payload.model}
+    except LLMProviderError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except Exception as exc:
+        print(f"LLM request failed: {type(exc).__name__}")
+        raise HTTPException(status_code=500, detail="The LLM request failed") from exc
+
+
 @app.get("/open/{provider}/{book_id}/{chapter_index}")
-async def open_ai_chat(provider: str, book_id: str, chapter_index: int):
+async def open_ai_chat(
+    provider: str,
+    book_id: str,
+    chapter_index: int,
+    action: str = "read",
+    instruction: str = "",
+):
     """Open a supported AI chat from a normal browser link (popup-safe)."""
     provider_url = AI_PROVIDER_URLS.get(provider)
     book = load_book_cached(book_id)
     if not provider_url or not book or chapter_index < 0 or chapter_index >= len(book.spine):
         raise HTTPException(status_code=404, detail="AI handoff not found")
     chapter = book.spine[chapter_index]
-    instruction = (
-        "Read this section with me. Start by explaining its main idea, then invite me "
-        "to ask questions. Cite source pages when available."
-    )
-    full_prompt = f"{instruction}\n\n{format_section_context(book, chapter)}"
+    selected_instruction = instruction.strip()[:2_000] or PROMPT_ACTIONS.get(action, PROMPT_ACTIONS["read"])
+    full_prompt = f"{selected_instruction}\n\n{format_section_context(book, chapter)}"
     if len(full_prompt) > AI_URL_MAX_CHARS:
         full_prompt = (
             f"{full_prompt[:AI_URL_MAX_CHARS]}\n\n"
@@ -176,9 +211,9 @@ async def open_ai_chat(provider: str, book_id: str, chapter_index: int):
     return RedirectResponse(provider_url + quote(full_prompt, safe=""), status_code=303)
 
 @app.get("/read/{book_id}", response_class=HTMLResponse)
-async def redirect_to_first_chapter(book_id: str):
+async def redirect_to_first_chapter(request: Request, book_id: str):
     """Helper to just go to chapter 0."""
-    return await read_chapter(book_id=book_id, chapter_index=0)
+    return await read_chapter(request=request, book_id=book_id, chapter_index=0)
 
 
 @app.get("/read/{book_id}/asset")

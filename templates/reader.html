@@ -16,18 +16,22 @@
         /* TOC Tree */
         ul.toc-list { list-style: none; padding-left: 0; margin: 0; }
         ul.toc-list ul { padding-left: 20px; } /* Indent children */
-        li.toc-item { margin-bottom: 8px; }
-        a.toc-link { text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 4px 0; line-height: 1.4; }
+        li.toc-item { margin-bottom: 5px; }
+        .toc-row { display: flex; align-items: flex-start; gap: 4px; }
+        a.toc-link { flex: 1; min-width: 0; text-decoration: none; color: #495057; font-size: 0.95em; display: block; padding: 4px 0; line-height: 1.4; }
         a.toc-link:hover { color: #000; text-decoration: underline; }
         a.toc-link.active { color: #d63384; font-weight: bold; }
+        .copy-icon { flex: 0 0 auto; border: 0; border-radius: 5px; background: transparent; color: #87909a; cursor: pointer; padding: 4px 5px; font: 600 .78rem -apple-system, sans-serif; }
+        .copy-icon:hover { color: #175fb9; background: #e9f1fb; }
 
         /* Main Content */
         #main { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
         .reader-surface { flex: 1; min-height: 0; overflow-y: auto; position: relative; scroll-behavior: smooth; }
         .reader-toolbar { display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 8px 14px; border-bottom: 1px solid #e4e7eb; background: #fff; font-family: -apple-system, sans-serif; overflow-x: auto; }
         .toolbar-title { min-width: 140px; margin-right: auto; }
-        .toolbar-title strong { display: block; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .85rem; }
-        .toolbar-title span { display: block; color: #727b86; font-size: .72rem; margin-top: 2px; }
+        .toolbar-title strong { display: flex; align-items: center; max-width: 330px; white-space: nowrap; font-size: .85rem; }
+        #current-section-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .toolbar-title > span { display: block; color: #727b86; font-size: .72rem; margin-top: 2px; }
         .action-btn { display: inline-block; border: 1px solid #ccd2d9; border-radius: 6px; background: #fff; color: #35404b; cursor: pointer; padding: 7px 10px; white-space: nowrap; text-decoration: none; font: 600 .76rem -apple-system, sans-serif; }
         .action-btn:hover { border-color: #2774d8; color: #175fb9; background: #f4f8fd; }
         .action-btn.primary { color: #fff; border-color: #2774d8; background: #2774d8; }
@@ -42,10 +46,14 @@
         .content-container.asset { max-width: none; height: 100%; padding: 0; }
         .pdf-viewer { display: block; width: 100%; height: 100%; border: 0; }
         .text-view { display: none; max-width: 820px; margin: 0 auto; padding: 44px 48px 80px; color: #24292f; }
-        .text-view h1 { margin: 0 0 8px; font: 700 1.55rem -apple-system, sans-serif; }
+        .text-heading-row { display: flex; align-items: flex-start; gap: 8px; }
+        .text-view h1 { flex: 1; margin: 0 0 8px; font: 700 1.55rem -apple-system, sans-serif; }
         .text-view .text-meta { color: #727b86; margin-bottom: 28px; font: .85rem -apple-system, sans-serif; }
         .markdown-content { font: 1.02rem/1.75 Georgia, serif; }
         .markdown-content .page-marker { display: inline-block; margin: 30px 0 14px; padding: 3px 8px; border-radius: 999px; background: #eef1f4; color: #68717b; font: 600 .72rem -apple-system, sans-serif; }
+        .paragraph-row { position: relative; padding-right: 28px; }
+        .paragraph-row > .copy-icon { position: absolute; top: 1px; right: 0; opacity: 0; }
+        .paragraph-row:hover > .copy-icon, .paragraph-row > .copy-icon:focus { opacity: 1; }
         .markdown-content p { margin: 0 0 1.2em; white-space: pre-wrap; overflow-wrap: anywhere; }
         .markdown-content figure { margin: 24px 0 32px; padding: 14px; border: 1px solid #e1e4e8; border-radius: 8px; background: #fff; }
         .markdown-content figure img { display: block; max-width: 100%; max-height: 680px; margin: 0 auto; object-fit: contain; }
@@ -59,6 +67,44 @@
         .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
         .book-content h1, .book-content h2, .book-content h3 { font-family: -apple-system, sans-serif; margin-top: 1.5em; color: #333; }
         .book-content p { margin-bottom: 1.5em; text-align: justify; }
+
+        /* In-page view controls */
+        .view-switcher { position: sticky; top: 12px; z-index: 5; width: max-content; margin: 12px auto -48px; padding: 4px; border: 1px solid #d8dce1; border-radius: 9px; background: rgba(255,255,255,.94); box-shadow: 0 2px 10px rgba(0,0,0,.08); font-family: -apple-system, sans-serif; }
+        .view-switcher .action-btn { border: 0; }
+
+        /* Settings */
+        #settings-popover { position: fixed; z-index: 30; top: 62px; right: 14px; display: none; width: min(390px, calc(100vw - 28px)); max-height: calc(100vh - 80px); overflow-y: auto; padding: 18px; border: 1px solid #d8dce1; border-radius: 12px; background: white; box-shadow: 0 12px 38px rgba(0,0,0,.2); font-family: -apple-system, sans-serif; }
+        #settings-popover.open { display: block; }
+        #settings-popover h2 { margin: 0 0 14px; font-size: 1rem; }
+        #settings-popover h3 { margin: 22px 0 8px; font-size: .86rem; }
+        .settings-field { display: block; margin: 0 0 12px; color: #59636f; font-size: .74rem; font-weight: 700; }
+        .settings-field input, .settings-field select, .settings-field textarea { box-sizing: border-box; width: 100%; margin-top: 5px; padding: 8px 9px; border: 1px solid #ccd2d9; border-radius: 7px; background: white; color: #20242a; font: .84rem -apple-system, sans-serif; }
+        .settings-field textarea { min-height: 72px; resize: vertical; }
+        .settings-note { color: #727b86; font-size: .72rem; line-height: 1.45; }
+        .settings-actions { display: flex; justify-content: flex-end; gap: 8px; }
+        .custom-prompt-item { display: flex; align-items: center; gap: 8px; margin-top: 7px; padding: 7px 8px; border-radius: 7px; background: #f4f6f8; font-size: .78rem; }
+        .custom-prompt-item span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Chat panel */
+        #chat-panel { display: none; flex: 0 0 420px; width: 420px; min-width: 320px; border-left: 1px solid #dfe3e7; background: #fff; font-family: -apple-system, sans-serif; }
+        #chat-panel.open { display: flex; flex-direction: column; }
+        .chat-header { display: flex; align-items: center; gap: 7px; min-height: 52px; padding: 8px 10px; border-bottom: 1px solid #e4e7eb; }
+        .chat-header strong { margin-right: auto; font-size: .86rem; }
+        #chat-session-select { min-width: 0; max-width: 155px; padding: 6px; border: 1px solid #ccd2d9; border-radius: 6px; }
+        #chat-messages { flex: 1; min-height: 0; overflow-y: auto; padding: 16px; background: #f7f8fa; }
+        .chat-message { max-width: 88%; margin: 0 0 12px; padding: 10px 12px; border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .84rem; line-height: 1.55; }
+        .chat-message.user { margin-left: auto; background: #2774d8; color: white; }
+        .chat-message.assistant { background: white; border: 1px solid #dfe3e7; }
+        .chat-message.pending { color: #727b86; }
+        .chat-composer { padding: 10px; border-top: 1px solid #dfe3e7; }
+        #chat-input { box-sizing: border-box; width: 100%; min-height: 70px; resize: vertical; padding: 9px; border: 1px solid #ccd2d9; border-radius: 8px; font: .84rem -apple-system, sans-serif; }
+        .chat-composer-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
+        #chat-provider-label { color: #727b86; font-size: .7rem; }
+
+        @media (max-width: 1050px) {
+            #sidebar { width: 240px; }
+            #chat-panel { position: fixed; z-index: 25; top: 0; right: 0; bottom: 0; width: min(420px, 92vw); box-shadow: -8px 0 28px rgba(0,0,0,.18); }
+        }
 
         /* Navigation Footer */
         .chapter-nav { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 20px; border-top: 1px solid #eee; font-family: -apple-system, sans-serif; }
@@ -84,10 +130,14 @@
             {% for item in items %}
                 <li class="toc-item">
                     {% set is_active = current_chapter.href == item.file_href %}
-                    <a href="#" data-file="{{ item.file_href }}" onclick="findAndGo(this.dataset.file); return false"
-                       class="toc-link {% if is_active %}active{% endif %}">
-                        {{ item.title }}
-                    </a>
+                    <div class="toc-row">
+                        <a href="#" data-file="{{ item.file_href }}" onclick="findAndGo(this.dataset.file); return false"
+                           class="toc-link {% if is_active %}active{% endif %}">
+                            {{ item.title }}
+                        </a>
+                        <button class="copy-icon" type="button" title="Copy this section as Markdown"
+                                data-file="{{ item.file_href }}" onclick="copyTocSection(event, this.dataset.file)">⧉</button>
+                    </div>
 
                     {% if item.children %}
                         {{ render_toc(item.children) }}
@@ -106,7 +156,9 @@
             {% if prev_idx is not none %}<a id="previous-section" class="toolbar-nav" href="/read/{{ book_id }}/{{ prev_idx }}" title="Previous section">←</a>{% else %}<a id="previous-section" class="toolbar-nav disabled" href="#" title="Previous section">←</a>{% endif %}
             {% if next_idx is not none %}<a id="next-section" class="toolbar-nav" href="/read/{{ book_id }}/{{ next_idx }}" title="Next section">→</a>{% else %}<a id="next-section" class="toolbar-nav disabled" href="#" title="Next section">→</a>{% endif %}
             <div class="toolbar-title">
-                <strong id="current-section-title">{{ current_chapter.title }}</strong>
+                <strong><span id="current-section-title">{{ current_chapter.title }}</span>
+                    <button class="copy-icon" type="button" title="Copy section as Markdown" onclick="copyCurrentSection()">⧉</button>
+                </strong>
                 <span id="current-section-meta">
                     {% if current_chapter.start_page %}Pages {{ current_chapter.start_page }}{% if current_chapter.end_page and current_chapter.end_page != current_chapter.start_page %}-{{ current_chapter.end_page }}{% endif %} · {% endif %}
                     {{ current_chapter.text|length }} characters
@@ -116,29 +168,30 @@
                 <button class="action-btn primary" type="button" onclick="copyImage()">Copy image</button>
             {% else %}
                 {% if document_type != "pdf" %}<button class="action-btn" type="button" onclick="copySelection()">Copy selection</button>{% endif %}
-                <button class="action-btn primary" type="button" onclick="copySection('plain')">Copy section</button>
-                <button class="action-btn" type="button" onclick="copyMarkdown()">Copy Markdown</button>
-                <button class="action-btn" type="button" onclick="copySection('explain')">Explain</button>
-                <button class="action-btn" type="button" onclick="copySection('summary')">Summarize</button>
-                <button class="action-btn" type="button" onclick="copySection('quiz')">Quiz me</button>
-                <span class="toolbar-divider"></span>
-                <a id="chatgpt-link" class="action-btn provider-btn" target="_blank" rel="noopener" href="/open/chatgpt/{{ book_id }}/{{ chapter_index }}">ChatGPT ↗</a>
-                <a id="claude-link" class="action-btn provider-btn" target="_blank" rel="noopener" href="/open/claude/{{ book_id }}/{{ chapter_index }}">Claude ↗</a>
-                <button class="action-btn provider-btn" type="button" onclick="prepareForGemini()" title="Prepare this section, then open Chrome Ask Gemini with Control-G">Ask Gemini (⌃G)</button>
-                {% if document_type == "pdf" %}
-                    <span class="toolbar-divider"></span>
-                    <button id="pdf-mode-button" class="action-btn active" type="button" onclick="setViewMode('pdf')">PDF</button>
-                    <button id="text-mode-button" class="action-btn" type="button" onclick="setViewMode('text')">Markdown</button>
-                {% endif %}
+                <button class="action-btn" type="button" onclick="copyCurrentSection()">Copy Markdown</button>
+                <button class="action-btn" type="button" onclick="runPromptAction('explain')">Explain</button>
+                <button class="action-btn" type="button" onclick="runPromptAction('summary')">Summarize</button>
+                <button class="action-btn" type="button" onclick="runPromptAction('quiz')">Quiz me</button>
+                <span id="custom-action-buttons"></span>
             {% endif %}
+            <span class="toolbar-divider"></span>
+            <button class="action-btn" type="button" onclick="toggleChatPanel()" title="AI chat">Chat</button>
+            <button id="settings-button" class="action-btn provider-btn" type="button" onclick="toggleSettings()" title="AI settings">⚙</button>
         </div>
         <div class="reader-surface">
         {% if document_type == "pdf" %}
+        <div class="view-switcher" aria-label="Document view">
+            <button id="pdf-mode-button" class="action-btn active" type="button" onclick="setViewMode('pdf')">PDF</button>
+            <button id="text-mode-button" class="action-btn" type="button" onclick="setViewMode('text')">Markdown</button>
+        </div>
         <div id="pdf-view" class="content-container asset">
             <iframe id="pdf-frame" class="pdf-viewer" src="/read/{{ book_id }}/asset?pageView={{ current_chapter.start_page or 1 }}#page={{ current_chapter.start_page or 1 }}" title="{{ book.metadata.title }}"></iframe>
         </div>
         <article id="text-view" class="text-view">
-            <h1 id="text-view-title"></h1>
+            <div class="text-heading-row">
+                <h1 id="text-view-title"></h1>
+                <button class="copy-icon" type="button" title="Copy section as Markdown" onclick="copyCurrentSection()">⧉</button>
+            </div>
             <div id="text-view-meta" class="text-meta"></div>
             <div id="text-view-content" class="markdown-content text-loading">Loading extracted text…</div>
         </article>
@@ -173,52 +226,158 @@
         {% endif %}
         </div>
     </div>
+
+    <aside id="settings-popover" aria-label="AI settings">
+        <h2>AI settings</h2>
+        <label class="settings-field">Default LLM
+            <select id="llm-provider" onchange="providerSelectionChanged()">
+                <option value="chatgpt-web">ChatGPT (web)</option>
+                <option value="claude-web">Claude (web)</option>
+                <option value="gemini-chrome">Ask Gemini in Chrome (⌃G)</option>
+                <option value="openai">OpenAI API</option>
+                <option value="anthropic">Anthropic API</option>
+                <option value="openai-compatible">OpenAI-compatible / Ollama</option>
+                <option value="apple-foundation">Apple Foundation Model (on-device)</option>
+            </select>
+        </label>
+        <div id="api-settings">
+            <label class="settings-field">Model
+                <input id="llm-model" type="text" autocomplete="off" placeholder="Model name">
+            </label>
+            <label id="base-url-field" class="settings-field">Base URL
+                <input id="llm-base-url" type="url" autocomplete="off" placeholder="http://127.0.0.1:11434/v1">
+            </label>
+            <label id="api-token-field" class="settings-field">API token
+                <input id="llm-api-token" type="password" autocomplete="off" placeholder="Stored only in this browser">
+            </label>
+        </div>
+        <p id="provider-status" class="settings-note"></p>
+        <p class="settings-note">API tokens are stored in this browser and sent to the local reader3 server only for provider requests. They are never written to reader3's files.</p>
+        <div class="settings-actions">
+            <button class="action-btn primary" type="button" onclick="saveSettings()">Save settings</button>
+        </div>
+
+        <h3>Custom prompt button</h3>
+        <label class="settings-field">Button label
+            <input id="custom-prompt-name" type="text" maxlength="40" placeholder="e.g. Find assumptions">
+        </label>
+        <label class="settings-field">Instruction
+            <textarea id="custom-prompt-text" maxlength="2000" placeholder="What should the selected LLM do with the current section?"></textarea>
+        </label>
+        <div class="settings-actions">
+            <button class="action-btn" type="button" onclick="addCustomPrompt()">Add button</button>
+        </div>
+        <div id="custom-prompt-list"></div>
+    </aside>
+
+    <aside id="chat-panel" aria-label="AI chat">
+        <div class="chat-header">
+            <strong>AI chat</strong>
+            <select id="chat-session-select" onchange="selectChatSession(this.value)" title="Saved chats"></select>
+            <button class="copy-icon" type="button" onclick="newChatSession()" title="New chat">＋</button>
+            <button class="copy-icon" type="button" onclick="deleteCurrentChat()" title="Delete this chat">⌫</button>
+            <button class="copy-icon" type="button" onclick="toggleChatPanel(false)" title="Close">×</button>
+        </div>
+        <div id="chat-messages"></div>
+        <div class="chat-composer">
+            <textarea id="chat-input" placeholder="Ask about the current section…" onkeydown="chatInputKeydown(event)"></textarea>
+            <div class="chat-composer-actions">
+                <span id="chat-provider-label"></span>
+                <button id="chat-send-button" class="action-btn primary" type="button" onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+    </aside>
     <div id="copy-status" role="status" aria-live="polite"></div>
 
     <script>
-        // Helper to map TOC filenames to Spine Indices
-        // Pass the spine data from python to JS
-        const spineMap = {
-            {% for ch in book.spine %}
-            {{ ch.href|tojson }}: {{ ch.order }},
-            {% endfor %}
-        };
+        const bookId = {{ book_id|tojson }};
         const documentTitle = {{ book.metadata.title|tojson }};
         const documentType = {{ document_type|tojson }};
+        const spineMap = {
+            {% for ch in book.spine %}{{ ch.href|tojson }}: {{ ch.order }},{% endfor %}
+        };
         const sectionData = [
-            {% for ch in book.spine %}
-            {
+            {% for ch in book.spine %}{
                 href: {{ ch.href|tojson }},
                 title: {{ ch.title|tojson }},
                 startPage: {{ ch.start_page|default(none)|tojson }},
                 endPage: {{ ch.end_page|default(none)|tojson }},
                 characterCount: {{ ch.text|length }},
-            },
-            {% endfor %}
+            },{% endfor %}
         ];
+        const promptPrefixes = {
+            explain: "Explain this section clearly. Define unfamiliar terms, walk through important reasoning step by step, and preserve references to source pages.",
+            summary: "Summarize this section. List the central claims, important definitions, and the minimum details needed to recall it later. Preserve references to source pages.",
+            quiz: "Tutor me on this section using retrieval practice. Ask one question at a time, wait for my answer, then give feedback and continue. Do not reveal all answers immediately.",
+        };
+        const apiProviders = new Set(["openai", "anthropic", "openai-compatible", "apple-foundation"]);
+        const settingsStorageKey = "reader3.ai.settings.v1";
+        const chatStorageKey = `reader3.ai.chats.${bookId}.v1`;
+        const viewStorageKey = `reader3.view.${bookId}`;
         const contextCache = new Map();
         let currentChapterIndex = {{ chapter_index }};
         let currentViewMode = "pdf";
+        let providerAvailability = {};
+
+        function defaultSettings() {
+            return {
+                provider: "chatgpt-web",
+                models: {
+                    openai: "gpt-5.6-terra",
+                    anthropic: "claude-sonnet-5",
+                    "openai-compatible": "llama3.2",
+                    "apple-foundation": "on-device",
+                },
+                tokens: {openai: "", anthropic: "", "openai-compatible": ""},
+                baseUrls: {"openai-compatible": "http://127.0.0.1:11434/v1"},
+                customPrompts: [],
+            };
+        }
+
+        function loadJSON(key, fallback) {
+            try {
+                return JSON.parse(localStorage.getItem(key)) || fallback;
+            } catch (_) {
+                return fallback;
+            }
+        }
+
+        let llmSettings = Object.assign(defaultSettings(), loadJSON(settingsStorageKey, {}));
+        llmSettings.models = Object.assign(defaultSettings().models, llmSettings.models || {});
+        llmSettings.tokens = Object.assign(defaultSettings().tokens, llmSettings.tokens || {});
+        llmSettings.baseUrls = Object.assign(defaultSettings().baseUrls, llmSettings.baseUrls || {});
+        llmSettings.customPrompts = Array.isArray(llmSettings.customPrompts) ? llmSettings.customPrompts : [];
+
+        function freshChatState() {
+            return {currentId: null, sessions: []};
+        }
+        let chatState = loadJSON(chatStorageKey, freshChatState());
+        if (!Array.isArray(chatState.sessions)) chatState = freshChatState();
+
+        function showStatus(message) {
+            const status = document.getElementById("copy-status");
+            status.textContent = message;
+            status.style.display = "block";
+            window.clearTimeout(showStatus.timer);
+            showStatus.timer = window.setTimeout(() => status.style.display = "none", 2600);
+        }
+
+        async function writeText(text, successMessage) {
+            await navigator.clipboard.writeText(text);
+            showStatus(successMessage);
+        }
 
         function findAndGo(filename) {
-            const cleanFile = filename.split('#')[0];
-            const idx = spineMap[cleanFile];
-            if (idx !== undefined) {
-                if (documentType === "pdf") {
-                    navigatePdfSection(idx);
-                } else {
-                    window.location.href = "/read/{{ book_id }}/" + idx;
-                }
-            } else {
-                console.log("Could not find index for", filename);
-            }
+            const idx = spineMap[filename.split("#")[0]];
+            if (idx === undefined) return;
+            if (documentType === "pdf") navigatePdfSection(idx);
+            else window.location.href = `/read/${bookId}/${idx}`;
         }
 
         function pageLabel(section) {
             if (!section.startPage) return `${section.characterCount.toLocaleString()} characters`;
             const pages = section.endPage && section.endPage !== section.startPage
-                ? `Pages ${section.startPage}-${section.endPage}`
-                : `Page ${section.startPage}`;
+                ? `Pages ${section.startPage}-${section.endPage}` : `Page ${section.startPage}`;
             return `${pages} · ${section.characterCount.toLocaleString()} characters`;
         }
 
@@ -234,30 +393,43 @@
                 const targetIndex = currentChapterIndex + offset;
                 const disabled = targetIndex < 0 || targetIndex >= sectionData.length;
                 link.classList.toggle("disabled", disabled);
-                link.href = disabled ? "#" : `/read/{{ book_id }}/${targetIndex}`;
+                link.href = disabled ? "#" : `/read/${bookId}/${targetIndex}`;
                 link.onclick = event => {
-                    if (disabled) {
+                    if (disabled) return event.preventDefault();
+                    if (documentType === "pdf") {
                         event.preventDefault();
-                        return;
+                        navigatePdfSection(targetIndex);
                     }
-                    if (documentType !== "pdf") return;
-                    event.preventDefault();
-                    navigatePdfSection(targetIndex);
                 };
-            }
-            for (const provider of ["chatgpt", "claude"]) {
-                const link = document.getElementById(`${provider}-link`);
-                if (link) link.href = `/open/${provider}/{{ book_id }}/${currentChapterIndex}`;
             }
         }
 
         async function getSectionContext(index = currentChapterIndex) {
             if (!contextCache.has(index)) {
-                const response = await fetch(`/api/read/{{ book_id }}/${index}/context`);
+                const response = await fetch(`/api/read/${bookId}/${index}/context`);
                 if (!response.ok) throw new Error("Context is unavailable");
                 contextCache.set(index, await response.json());
             }
             return contextCache.get(index);
+        }
+
+        function copyButton(text, label = "Copy paragraph") {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "copy-icon";
+            button.title = label;
+            button.textContent = "⧉";
+            button.onclick = () => writeText(text, "Copied").catch(() => showStatus("Copy failed"));
+            return button;
+        }
+
+        function appendCopyableParagraph(container, text) {
+            const row = document.createElement("div");
+            const paragraph = document.createElement("p");
+            row.className = "paragraph-row";
+            paragraph.textContent = text;
+            row.append(paragraph, copyButton(text));
+            container.appendChild(row);
         }
 
         async function renderTextSection() {
@@ -270,13 +442,11 @@
             try {
                 const payload = await getSectionContext();
                 content.replaceChildren();
-                const marker = /^\[Page (\d+)\]\s*$/gm;
-                const matches = [...(payload.text || "").matchAll(marker)];
+                const pagePattern = /^\[Page (\d+)\]\s*$/gm;
+                const matches = [...(payload.text || "").matchAll(pagePattern)];
                 const appendParagraphs = text => {
-                    for (const paragraphText of text.trim().split(/\n{2,}/).filter(Boolean)) {
-                        const paragraph = document.createElement("p");
-                        paragraph.textContent = paragraphText;
-                        content.appendChild(paragraph);
+                    for (const paragraph of text.trim().split(/\n{2,}/).filter(Boolean)) {
+                        appendCopyableParagraph(content, paragraph);
                     }
                 };
                 const appendImages = page => {
@@ -317,7 +487,7 @@
         function showPdfPage(section) {
             const frame = document.getElementById("pdf-frame");
             const page = section.startPage || 1;
-            const nextSource = `/read/{{ book_id }}/asset?pageView=${page}#page=${page}`;
+            const nextSource = `/read/${bookId}/asset?pageView=${page}#page=${page}`;
             if (frame.getAttribute("src") === nextSource) return;
             const nextFrame = frame.cloneNode(false);
             nextFrame.setAttribute("src", nextSource);
@@ -327,15 +497,16 @@
         function navigatePdfSection(index, pushHistory = true) {
             if (index < 0 || index >= sectionData.length) return;
             currentChapterIndex = index;
-            const section = sectionData[index];
-            if (currentViewMode === "pdf") showPdfPage(section);
+            if (currentViewMode === "pdf") showPdfPage(sectionData[index]);
             updateNavigation();
             if (currentViewMode === "text") renderTextSection();
-            if (pushHistory) history.pushState({chapterIndex: index}, "", `/read/{{ book_id }}/${index}`);
+            if (pushHistory) history.pushState({chapterIndex: index}, "", `/read/${bookId}/${index}`);
         }
 
         function setViewMode(mode) {
+            if (documentType !== "pdf") return;
             currentViewMode = mode;
+            localStorage.setItem(viewStorageKey, mode);
             document.getElementById("pdf-view").style.display = mode === "pdf" ? "block" : "none";
             document.getElementById("text-view").style.display = mode === "text" ? "block" : "none";
             document.getElementById("pdf-mode-button").classList.toggle("active", mode === "pdf");
@@ -344,74 +515,37 @@
             else showPdfPage(sectionData[currentChapterIndex]);
         }
 
-        const promptPrefixes = {
-            explain: "Explain this section clearly. Define unfamiliar terms, walk through important reasoning step by step, and preserve references to source pages.",
-            summary: "Summarize this section. List the central claims, important definitions, and the minimum details needed to recall it later. Preserve references to source pages.",
-            quiz: "Tutor me on this section using retrieval practice. Ask one question at a time, wait for my answer, then give feedback and continue. Do not reveal all answers immediately.",
-        };
-
-        function showStatus(message) {
-            const status = document.getElementById("copy-status");
-            status.textContent = message;
-            status.style.display = "block";
-            window.clearTimeout(showStatus.timer);
-            showStatus.timer = window.setTimeout(() => status.style.display = "none", 2200);
+        async function copySectionByIndex(index) {
+            const payload = await getSectionContext(index);
+            await writeText(payload.markdown, "Section copied as Markdown");
         }
 
-        async function writeText(text, successMessage) {
-            await navigator.clipboard.writeText(text);
-            showStatus(successMessage);
+        function copyCurrentSection() {
+            copySectionByIndex(currentChapterIndex).catch(error => showStatus(error.message || "Copy failed"));
         }
 
-        async function copySection(mode) {
-            try {
-                const payload = await getSectionContext();
-                if (!payload.character_count) {
-                    showStatus("No extractable text in this section");
-                    return;
-                }
-                const prefix = promptPrefixes[mode];
-                const output = prefix ? `${prefix}\n\n${payload.context}` : payload.context;
-                await writeText(output, prefix ? "Prompt and section copied" : "Section copied");
-            } catch (error) {
-                showStatus(error.message || "Copy failed");
-            }
-        }
-
-        async function copyMarkdown() {
-            try {
-                const payload = await getSectionContext();
-                await writeText(payload.markdown, "Markdown copied");
-            } catch (error) {
-                showStatus(error.message || "Copy failed");
-            }
+        function copyTocSection(event, filename) {
+            event.preventDefault();
+            event.stopPropagation();
+            const index = spineMap[filename.split("#")[0]];
+            if (index !== undefined) copySectionByIndex(index).catch(() => showStatus("Copy failed"));
         }
 
         async function copySelection() {
             const selection = window.getSelection().toString().trim();
-            if (!selection) {
-                showStatus("Select some text first");
-                return;
-            }
-            const header = `# ${documentTitle}\nSection: ${sectionData[currentChapterIndex].title}\n\n---\n\n`;
+            if (!selection) return showStatus("Select some text first");
+            const header = `# ${sectionData[currentChapterIndex].title}\n\n`;
             try {
                 await writeText(header + selection, "Selection copied");
-            } catch (error) {
+            } catch (_) {
                 showStatus("Copy failed");
             }
         }
 
-        function prepareForGemini() {
-            if (documentType === "pdf") setViewMode("text");
-            window.focus();
-            showStatus("Ready — press ⌃G to open Chrome Ask Gemini");
-        }
-
         async function copyImage() {
             try {
-                const response = await fetch("/read/{{ book_id }}/asset");
-                const sourceBlob = await response.blob();
-                const image = await createImageBitmap(sourceBlob);
+                const response = await fetch(`/read/${bookId}/asset`);
+                const image = await createImageBitmap(await response.blob());
                 const canvas = document.createElement("canvas");
                 canvas.width = image.width;
                 canvas.height = image.height;
@@ -419,13 +553,346 @@
                 const pngBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
                 await navigator.clipboard.write([new ClipboardItem({"image/png": pngBlob})]);
                 showStatus("Image copied");
-            } catch (error) {
+            } catch (_) {
                 showStatus("This browser could not copy the image");
             }
         }
 
+        function toggleSettings(force) {
+            const popover = document.getElementById("settings-popover");
+            popover.classList.toggle("open", force ?? !popover.classList.contains("open"));
+        }
+
+        function providerLabel(provider = llmSettings.provider) {
+            return {
+                "chatgpt-web": "ChatGPT web",
+                "claude-web": "Claude web",
+                "gemini-chrome": "Ask Gemini in Chrome",
+                openai: "OpenAI API",
+                anthropic: "Anthropic API",
+                "openai-compatible": "OpenAI-compatible",
+                "apple-foundation": "Apple Foundation Model",
+            }[provider] || provider;
+        }
+
+        function providerSelectionChanged() {
+            const provider = document.getElementById("llm-provider").value;
+            const isApi = apiProviders.has(provider);
+            document.getElementById("api-settings").style.display = isApi ? "block" : "none";
+            document.getElementById("base-url-field").style.display = provider === "openai-compatible" ? "block" : "none";
+            document.getElementById("api-token-field").style.display = ["openai", "anthropic", "openai-compatible"].includes(provider) ? "block" : "none";
+            const modelInput = document.getElementById("llm-model");
+            modelInput.value = llmSettings.models[provider] || "";
+            modelInput.disabled = provider === "apple-foundation";
+            document.getElementById("llm-base-url").value = llmSettings.baseUrls[provider] || "";
+            document.getElementById("llm-api-token").value = llmSettings.tokens[provider] || "";
+            const status = document.getElementById("provider-status");
+            if (provider === "gemini-chrome") {
+                status.textContent = "Reader3 prepares and copies the prompt; press Control-G in Chrome and paste it into Ask Gemini.";
+            } else if (provider === "apple-foundation") {
+                const apple = providerAvailability.apple_foundation || {};
+                status.textContent = apple.available ? "Apple on-device model is available." : (apple.reason || "Checking Apple model availability…");
+            } else if (provider.endsWith("-web")) {
+                status.textContent = "Actions open a new provider tab with the current section.";
+            } else {
+                status.textContent = "Actions and chat run inside reader3's right-side panel.";
+            }
+            updateChatProviderLabel();
+        }
+
+        function saveSettings() {
+            const provider = document.getElementById("llm-provider").value;
+            llmSettings.provider = provider;
+            llmSettings.models[provider] = document.getElementById("llm-model").value.trim();
+            llmSettings.baseUrls[provider] = document.getElementById("llm-base-url").value.trim();
+            llmSettings.tokens[provider] = document.getElementById("llm-api-token").value.trim();
+            localStorage.setItem(settingsStorageKey, JSON.stringify(llmSettings));
+            renderCustomPrompts();
+            updateChatProviderLabel();
+            toggleSettings(false);
+            showStatus(`${providerLabel()} selected`);
+        }
+
+        function renderCustomPrompts() {
+            const buttons = document.getElementById("custom-action-buttons");
+            if (buttons) {
+                buttons.replaceChildren();
+                for (const prompt of llmSettings.customPrompts) {
+                    const button = document.createElement("button");
+                    button.type = "button";
+                    button.className = "action-btn";
+                    button.textContent = prompt.name;
+                    button.onclick = () => runPromptAction("custom", prompt.instruction, prompt.name);
+                    buttons.appendChild(button);
+                }
+            }
+            const list = document.getElementById("custom-prompt-list");
+            list.replaceChildren();
+            for (const prompt of llmSettings.customPrompts) {
+                const row = document.createElement("div");
+                const name = document.createElement("span");
+                const remove = document.createElement("button");
+                row.className = "custom-prompt-item";
+                name.textContent = prompt.name;
+                name.title = prompt.instruction;
+                remove.type = "button";
+                remove.className = "copy-icon";
+                remove.textContent = "×";
+                remove.title = "Remove prompt";
+                remove.onclick = () => removeCustomPrompt(prompt.id);
+                row.append(name, remove);
+                list.appendChild(row);
+            }
+        }
+
+        function addCustomPrompt() {
+            const nameInput = document.getElementById("custom-prompt-name");
+            const textInput = document.getElementById("custom-prompt-text");
+            const name = nameInput.value.trim();
+            const instruction = textInput.value.trim();
+            if (!name || !instruction) return showStatus("Enter a button label and instruction");
+            llmSettings.customPrompts.push({
+                id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+                name,
+                instruction,
+            });
+            localStorage.setItem(settingsStorageKey, JSON.stringify(llmSettings));
+            nameInput.value = "";
+            textInput.value = "";
+            renderCustomPrompts();
+            showStatus("Custom prompt button added");
+        }
+
+        function removeCustomPrompt(id) {
+            llmSettings.customPrompts = llmSettings.customPrompts.filter(prompt => prompt.id !== id);
+            localStorage.setItem(settingsStorageKey, JSON.stringify(llmSettings));
+            renderCustomPrompts();
+        }
+
+        async function runPromptAction(action, customInstruction = "", label = "") {
+            const instruction = customInstruction || promptPrefixes[action];
+            const provider = llmSettings.provider;
+            if (!instruction) return;
+            if (provider === "chatgpt-web" || provider === "claude-web") {
+                const target = provider === "chatgpt-web" ? "chatgpt" : "claude";
+                const params = customInstruction
+                    ? `instruction=${encodeURIComponent(customInstruction)}`
+                    : `action=${encodeURIComponent(action)}`;
+                const opened = window.open(`/open/${target}/${bookId}/${currentChapterIndex}?${params}`, "_blank", "noopener");
+                if (!opened) showStatus("Allow pop-ups to open the selected LLM");
+                return;
+            }
+            const payload = await getSectionContext();
+            const fullPrompt = `${instruction}\n\n${payload.context}`;
+            if (provider === "gemini-chrome") {
+                if (documentType === "pdf") setViewMode("text");
+                await writeText(fullPrompt, "Prompt copied — press ⌃G and paste into Ask Gemini");
+                return;
+            }
+            await sendPromptToPanel(label || action, fullPrompt);
+        }
+
+        function saveChatState() {
+            chatState.sessions = chatState.sessions.slice(0, 20).map(session => ({
+                ...session,
+                messages: session.messages.slice(-80),
+            }));
+            try {
+                localStorage.setItem(chatStorageKey, JSON.stringify(chatState));
+            } catch (_) {
+                showStatus("Chat history is too large to save in this browser");
+            }
+        }
+
+        function currentChat() {
+            return chatState.sessions.find(session => session.id === chatState.currentId) || null;
+        }
+
+        function ensureChat() {
+            let session = currentChat();
+            if (!session) {
+                const id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now());
+                session = {id, title: "New chat", updatedAt: Date.now(), messages: []};
+                chatState.sessions.unshift(session);
+                chatState.currentId = id;
+                saveChatState();
+            }
+            return session;
+        }
+
+        function renderChat() {
+            const select = document.getElementById("chat-session-select");
+            select.replaceChildren();
+            for (const session of chatState.sessions) {
+                const option = document.createElement("option");
+                option.value = session.id;
+                option.textContent = session.title;
+                option.selected = session.id === chatState.currentId;
+                select.appendChild(option);
+            }
+            const messages = document.getElementById("chat-messages");
+            messages.replaceChildren();
+            const session = currentChat();
+            for (const message of session?.messages || []) {
+                const bubble = document.createElement("div");
+                bubble.className = `chat-message ${message.role}`;
+                bubble.textContent = message.display || message.content;
+                messages.appendChild(bubble);
+            }
+            messages.scrollTop = messages.scrollHeight;
+            updateChatProviderLabel();
+        }
+
+        function updateChatProviderLabel() {
+            const label = document.getElementById("chat-provider-label");
+            if (label) label.textContent = providerLabel();
+        }
+
+        function toggleChatPanel(force) {
+            const panel = document.getElementById("chat-panel");
+            panel.classList.toggle("open", force ?? !panel.classList.contains("open"));
+            if (panel.classList.contains("open")) {
+                ensureChat();
+                renderChat();
+            }
+        }
+
+        function newChatSession() {
+            chatState.currentId = null;
+            ensureChat();
+            renderChat();
+            document.getElementById("chat-input").focus();
+        }
+
+        function selectChatSession(id) {
+            chatState.currentId = id;
+            saveChatState();
+            renderChat();
+        }
+
+        function deleteCurrentChat() {
+            const session = currentChat();
+            if (!session || !window.confirm(`Delete “${session.title}”?`)) return;
+            chatState.sessions = chatState.sessions.filter(item => item.id !== session.id);
+            chatState.currentId = chatState.sessions[0]?.id || null;
+            if (!chatState.currentId) ensureChat();
+            saveChatState();
+            renderChat();
+        }
+
+        function appendChatMessage(session, role, content, display = "") {
+            session.messages.push({role, content, display, createdAt: Date.now()});
+            session.updatedAt = Date.now();
+            if (role === "user" && session.title === "New chat") {
+                session.title = (display || content).replace(/\s+/g, " ").slice(0, 46);
+            }
+            chatState.sessions.sort((a, b) => b.updatedAt - a.updatedAt);
+            chatState.currentId = session.id;
+            saveChatState();
+        }
+
+        async function callConfiguredLLM(session) {
+            const provider = llmSettings.provider;
+            const response = await fetch("/api/llm/chat", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({
+                    provider,
+                    model: llmSettings.models[provider] || "",
+                    api_token: llmSettings.tokens[provider] || "",
+                    base_url: llmSettings.baseUrls[provider] || "",
+                    instructions: "You are a thoughtful reading assistant. Answer using the supplied document context, cite source pages when available, and say when the source does not support a claim.",
+                    messages: session.messages.map(({role, content}) => ({role, content})),
+                }),
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) throw new Error(payload.detail || "The LLM request failed");
+            return payload.message;
+        }
+
+        async function sendPromptToPanel(display, content) {
+            toggleChatPanel(true);
+            const session = ensureChat();
+            appendChatMessage(session, "user", content, display);
+            renderChat();
+            const messages = document.getElementById("chat-messages");
+            const pending = document.createElement("div");
+            pending.className = "chat-message assistant pending";
+            pending.textContent = "Thinking…";
+            messages.appendChild(pending);
+            messages.scrollTop = messages.scrollHeight;
+            const sendButton = document.getElementById("chat-send-button");
+            sendButton.disabled = true;
+            try {
+                appendChatMessage(session, "assistant", await callConfiguredLLM(session));
+            } catch (error) {
+                appendChatMessage(session, "assistant", `Error: ${error.message}`);
+            } finally {
+                sendButton.disabled = false;
+                renderChat();
+            }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById("chat-input");
+            const question = input.value.trim();
+            if (!question) return;
+            const provider = llmSettings.provider;
+            input.value = "";
+            if (!apiProviders.has(provider)) {
+                await runPromptAction("custom", question, question);
+                return;
+            }
+            const session = ensureChat();
+            let content = question;
+            if (!session.messages.length) {
+                const section = await getSectionContext();
+                content += `\n\nUse this section as context:\n\n${section.context}`;
+            }
+            await sendPromptToPanel(question, content);
+        }
+
+        function chatInputKeydown(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                sendChatMessage();
+            }
+        }
+
+        function enhanceStaticParagraphs() {
+            document.querySelectorAll(".book-content p").forEach(paragraph => {
+                if (paragraph.parentElement.classList.contains("paragraph-row")) return;
+                const row = document.createElement("div");
+                row.className = "paragraph-row";
+                paragraph.replaceWith(row);
+                row.append(paragraph, copyButton(paragraph.textContent.trim()));
+            });
+        }
+
+        async function initializeAISettings() {
+            document.getElementById("llm-provider").value = llmSettings.provider;
+            try {
+                providerAvailability = await (await fetch("/api/llm/status")).json();
+            } catch (_) {
+                providerAvailability = {};
+            }
+            providerSelectionChanged();
+            renderCustomPrompts();
+            renderChat();
+        }
+
+        document.addEventListener("click", event => {
+            const popover = document.getElementById("settings-popover");
+            if (popover.classList.contains("open") && !popover.contains(event.target) && !document.getElementById("settings-button").contains(event.target)) {
+                toggleSettings(false);
+            }
+        });
+
         updateNavigation();
+        enhanceStaticParagraphs();
+        initializeAISettings();
         if (documentType === "pdf") {
+            setViewMode(localStorage.getItem(viewStorageKey) || "pdf");
             window.addEventListener("popstate", event => {
                 const index = event.state?.chapterIndex;
                 if (Number.isInteger(index)) navigatePdfSection(index, false);
