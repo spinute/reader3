@@ -68,7 +68,7 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 
 ## Deferred work
 
-- OCR for scanned PDFs and extracting text from standalone images.
+- Configurable OCR languages and extracting text from standalone images (English Tesseract fallback is implemented for image-only PDF pages).
 - Equation-to-LaTeX conversion.
 - Semantic figure/caption association and multimodal section bundles (raster figures are already extracted by page).
 - Authenticated provider APIs for ChatGPT, Claude, Apple Foundation Models, or Ollama.
@@ -85,4 +85,4 @@ The browser handoff and reading-performance follow-up adds:
 - an Ask Gemini action that prepares the current tab and displays Chrome's `Control-G` shortcut;
 - a 7,800-character URL limit with explicit truncation feedback.
 
-Direct provider APIs, authenticated conversations, OCR, equation-to-LaTeX conversion, and automatic Gemini in Chrome side-panel activation remain deferred. Gemini in Chrome can read the current tab through Chrome's own UI, but regular web pages do not have a public API for opening that privileged side panel.
+Direct provider APIs, authenticated conversations, configurable OCR, equation-to-LaTeX conversion, and automatic Gemini in Chrome side-panel activation remain deferred. Gemini in Chrome can read the current tab through Chrome's own UI, but regular web pages do not have a public API for opening that privileged side panel.

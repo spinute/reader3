@@ -31,6 +31,7 @@ class ChapterContent:
     start_page: Optional[int] = None
     end_page: Optional[int] = None
     media: List[str] = field(default_factory=list)
+    media_captions: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass

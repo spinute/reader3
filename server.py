@@ -130,10 +130,11 @@ async def section_context(book_id: str, chapter_index: int):
     media = []
     for media_path in getattr(chapter, "media", []):
         match = re.search(r"pdf-page-(\d+)-image-", media_path)
+        caption = getattr(chapter, "media_captions", {}).get(media_path)
         media.append({
             "url": f"/read/{book_id}/images/{os.path.basename(media_path)}",
             "page": int(match.group(1)) if match else None,
-            "alt": f"Extracted figure from page {match.group(1)}" if match else "Extracted figure",
+            "alt": caption or (f"Extracted figure from page {match.group(1)}" if match else "Extracted figure"),
         })
     markdown = re.sub(r"^\[Page (\d+)\]$", r"## Page \1", chapter.text, flags=re.MULTILINE)
     markdown = f"# {chapter.title}\n\n{markdown}".strip()

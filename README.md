@@ -30,6 +30,8 @@ Reader 3 keeps the source document visible while preparing each section as porta
 
 - PDF bookmarks become a nested table of contents with page-range navigation.
 - Extractable PDF text is stored by section while the original PDF remains unchanged.
+- Image-only PDF pages use local Tesseract OCR when it is installed; imports still work without it.
+- Extracted raster figures use visible `Figure` captions when the PDF text contains them.
 - EPUB and HTML content use their existing section text.
 - **Copy section** includes the document title, section title, source pages, and text.
 - **Explain**, **Summarize**, and **Quiz me** copy a task-specific prompt with the section context.
@@ -42,7 +44,7 @@ Reader 3 keeps the source document visible while preparing each section as porta
 
 URL handoff is capped at 7,800 characters for browser compatibility. Use **Copy section** when a longer section must be sent in full. Chrome does not expose its privileged Ask Gemini panel to ordinary page JavaScript, so reader3 cannot synthesize the final `Control-G` shortcut itself.
 
-Scanned PDFs need OCR before their text can be used as LLM context. See [`docs/plan/llm-reading-mvp.md`](docs/plan/llm-reading-mvp.md) for the implemented scope and deferred work.
+OCR quality depends on the scan and currently defaults to English. See [`docs/plan/llm-reading-mvp.md`](docs/plan/llm-reading-mvp.md) for the implemented scope and deferred work.
 
 You can still import EPUB files from the command line. For example, download [Dracula EPUB3](https://www.gutenberg.org/ebooks/345) as `dracula.epub`, then:
 

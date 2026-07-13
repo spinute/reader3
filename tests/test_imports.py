@@ -14,6 +14,8 @@ import reader3
 import server
 from importers import (
     DocumentImportError,
+    _extract_pdf_captions,
+    _extract_pdf_pages,
     _normalize_pdf_page_text,
     _sanitize_html,
     _validate_public_url,
@@ -39,6 +41,24 @@ def make_pdf(page_count=3, with_outline=False):
 
 
 class ImporterTests(unittest.TestCase):
+    def test_pdf_page_uses_ocr_when_embedded_text_is_missing(self):
+        page = type("Page", (), {"extract_text": lambda self: ""})()
+        reader = type("Reader", (), {"pages": [page]})()
+        with patch("importers._ocr_pdf_page", return_value="Recovered scanned text") as ocr:
+            extracted = _extract_pdf_pages(reader)
+
+        ocr.assert_called_once_with(page)
+        self.assertEqual(extracted, ["Recovered scanned text"])
+
+    def test_pdf_figure_caption_wraps_hyphenated_line(self):
+        text = "Figure 2.3 Illustration of the accura-\ncy of the classifier.\nBody text follows."
+        page = type("Page", (), {"extract_text": lambda self: text})()
+        reader = type("Reader", (), {"pages": [page]})()
+        self.assertEqual(
+            _extract_pdf_captions(reader),
+            {1: ["Figure 2.3 Illustration of the accuracy of the classifier."]},
+        )
+
     def test_html_is_sanitized_and_imported(self):
         with tempfile.TemporaryDirectory() as root:
             source = Path(root) / "article.html"

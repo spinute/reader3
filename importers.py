@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import ipaddress
+import io
 import mimetypes
 import re
 import shutil
 import socket
+import subprocess
 from collections import Counter
 from datetime import datetime
 from dataclasses import dataclass, field
@@ -176,13 +178,44 @@ def _normalize_pdf_page_text(text: str) -> str:
     return "\n\n".join(paragraphs)
 
 
+def _ocr_pdf_page(page) -> str:
+    """OCR a likely scanned page when Tesseract and a large page image are available."""
+    executable = shutil.which("tesseract")
+    if not executable:
+        return ""
+    try:
+        candidates = list(page.images)
+        if not candidates:
+            return ""
+        image_file = max(candidates, key=lambda candidate: candidate.image.width * candidate.image.height)
+        image = image_file.image
+        if image.width * image.height < 250_000:
+            return ""
+        payload = io.BytesIO()
+        image.convert("RGB").save(payload, format="PNG")
+        result = subprocess.run(
+            [executable, "stdin", "stdout", "-l", "eng", "--dpi", "300"],
+            input=payload.getvalue(),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=45,
+            check=False,
+        )
+        return result.stdout.decode("utf-8", errors="replace") if result.returncode == 0 else ""
+    except Exception:
+        return ""
+
+
 def _extract_pdf_pages(reader: PdfReader) -> list[str]:
     raw_pages: list[str] = []
     for page in reader.pages:
         try:
-            raw_pages.append(page.extract_text() or "")
+            raw_text = page.extract_text() or ""
         except Exception:
-            raw_pages.append("")
+            raw_text = ""
+        if len(re.sub(r"\s+", "", raw_text)) < 20:
+            raw_text = _ocr_pdf_page(page) or raw_text
+        raw_pages.append(raw_text)
 
     def signature(line: str) -> str:
         normalized = re.sub(r"\d+", "#", " ".join(line.lower().split()))
@@ -207,6 +240,33 @@ def _extract_pdf_pages(reader: PdfReader) -> list[str]:
         ]
         pages.append(_normalize_pdf_page_text("\n".join(filtered)))
     return pages
+
+
+def _extract_pdf_captions(reader: PdfReader) -> dict[int, list[str]]:
+    """Extract visible Figure/Fig. caption lines for accessible image labels."""
+    result: dict[int, list[str]] = {}
+    caption_pattern = re.compile(r"^(?:Figure|Fig\.)\s+\d+(?:\.\d+)*\s+.+", re.IGNORECASE)
+    for page_number, page in enumerate(reader.pages, start=1):
+        try:
+            lines = [" ".join(line.split()) for line in (page.extract_text() or "").splitlines()]
+        except Exception:
+            continue
+        captions = []
+        for index, line in enumerate(lines):
+            if not caption_pattern.match(line):
+                continue
+            caption = line
+            cursor = index + 1
+            while cursor < len(lines) and len(caption) < 320 and not re.search(r"[.!?]$", caption):
+                continuation = lines[cursor]
+                if not continuation or caption_pattern.match(continuation):
+                    break
+                caption = caption[:-1] + continuation if caption.endswith("-") else f"{caption} {continuation}"
+                cursor += 1
+            captions.append(caption[:320])
+        if captions:
+            result[page_number] = captions
+    return result
 
 
 def _extract_pdf_images(reader: PdfReader, output_dir: Path) -> dict[int, list[str]]:
@@ -292,6 +352,7 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
 
     extracted_pages = _extract_pdf_pages(reader)
     extracted_images = _extract_pdf_images(reader, output_dir)
+    extracted_captions = _extract_pdf_captions(reader)
     spine = []
     for index, start_page in enumerate(start_pages):
         end_page = start_pages[index + 1] - 1 if index + 1 < len(start_pages) else page_count
@@ -314,6 +375,12 @@ def _pdf_book(source: Path, output_dir: Path, source_url: str | None) -> Book:
                 for page_number in range(start_page, end_page + 1)
                 for image_path in extracted_images.get(page_number, [])
             ],
+            media_captions={
+                image_path: extracted_captions[page_number][min(image_index, len(extracted_captions[page_number]) - 1)]
+                for page_number in range(start_page, end_page + 1)
+                if extracted_captions.get(page_number)
+                for image_index, image_path in enumerate(extracted_images.get(page_number, []))
+            },
         ))
 
     assets_dir = output_dir / "assets"
