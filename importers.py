@@ -503,7 +503,19 @@ def _sanitize_html(raw_html: str, base_url: str | None = None) -> tuple[str, str
                 del node.attrs[attribute]
 
     content = "".join(str(node) for node in root.contents)
-    text = " ".join(root.get_text(" ").split())
+    text_root = BeautifulSoup(str(root), "html.parser")
+    for br in text_root.find_all("br"):
+        br.replace_with("\n")
+    for block in text_root.find_all(
+        ["article", "section", "div", "p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote", "pre", "tr"]
+    ):
+        block.insert_before("\n\n")
+        block.append("\n\n")
+    text = text_root.get_text()
+    text = re.sub(r"[^\S\n]+", " ", text)
+    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{2,}", "\n\n", text)
+    text = re.sub(r"(?<!\n)\n(?!\n)", " ", text).strip()
     if not title:
         heading = root.find(["h1", "h2"])
         title = heading.get_text(" ", strip=True) if heading else "HTML document"

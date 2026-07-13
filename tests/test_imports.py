@@ -87,6 +87,8 @@ class ImporterTests(unittest.TestCase):
                 '<html><head><title>Test article</title></head><body>'
                 '<script>alert(1)</script><h1>Hello</h1>'
                 '<a href="javascript:alert(1)" onclick="alert(1)">bad</a>'
+                '<p>First paragraph.</p><p>Second paragraph.</p>'
+                '<font>Third paragraph.<br><br>Fourth paragraph.</font>'
                 '<img src="/figure.png"></body></html>',
                 encoding="utf-8",
             )
@@ -100,6 +102,8 @@ class ImporterTests(unittest.TestCase):
             self.assertNotIn("javascript:", book.spine[0].content)
             self.assertNotIn("onclick", book.spine[0].content)
             self.assertIn("https://example.com/figure.png", book.spine[0].content)
+            self.assertIn("First paragraph.\n\nSecond paragraph.", book.spine[0].text)
+            self.assertIn("Third paragraph.\n\nFourth paragraph.", book.spine[0].text)
 
     def test_image_is_preserved_as_an_asset(self):
         with tempfile.TemporaryDirectory() as root:
@@ -307,12 +311,13 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mocked_run.assert_called_once_with("Explain this section.")
 
-    def test_gemini_ignores_empty_exit_error_after_submission(self):
+    def test_gemini_reports_empty_exit_error_after_submission(self):
         completed = type("Completed", (), {"returncode": 1, "stderr": "", "stdout": ""})()
         with patch("server.platform.system", return_value="Darwin"), patch(
             "server.subprocess.run", return_value=completed
         ):
-            server.run_gemini_chrome("Explain this section.")
+            with self.assertRaisesRegex(RuntimeError, "exited with status 1"):
+                server.run_gemini_chrome("Explain this section.")
 
     def test_library_contains_upload_controls(self):
         response = self.client.get("/")

@@ -70,12 +70,13 @@ def run_gemini_chrome(prompt: str) -> None:
 on run argv
     set the clipboard to item 1 of argv
     tell application "Google Chrome" to activate
-    delay 0.5
+    delay 1.0
     tell application "System Events"
-        keystroke "g" using control down
-        delay 1.2
-        keystroke "v" using command down
-        delay 0.2
+        set frontmost of process "Google Chrome" to true
+        key code 5 using {control down}
+        delay 2.0
+        key code 9 using {command down}
+        delay 0.4
         key code 36
     end tell
     return "sent"
@@ -96,8 +97,7 @@ end run
                 "running reader3 in System Settings > Privacy & Security > Accessibility, "
                 "then retry. The prompt is already on the clipboard."
             )
-        if detail:
-            raise RuntimeError(detail)
+        raise RuntimeError(detail or f"Chrome automation exited with status {completed.returncode}")
 
 
 def list_books():
