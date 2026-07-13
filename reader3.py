@@ -65,6 +65,9 @@ class Book:
     source_file: str
     processed_at: str
     version: str = "3.0"
+    document_type: str = "epub"
+    asset_filename: Optional[str] = None
+    source_url: Optional[str] = None
 
 
 # --- Utilities ---

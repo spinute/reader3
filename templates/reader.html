@@ -24,6 +24,11 @@
         /* Main Content */
         #main { flex-grow: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
         .content-container { max-width: 700px; margin: 0 auto; padding: 60px 40px; line-height: 1.8; font-size: 1.15em; color: #212529; }
+        .content-container.asset { max-width: none; height: 100%; padding: 0; }
+        .pdf-viewer { display: block; width: 100%; height: 100%; border: 0; }
+        .image-viewer { display: flex; justify-content: center; align-items: flex-start; min-height: 100%; padding: 40px; background: #e9ecef; }
+        .image-viewer img { max-width: 100%; height: auto; box-shadow: 0 4px 24px rgba(0,0,0,.16); background: white; }
+        .source-link { display: block; margin: -8px 0 18px; color: #68717b; overflow-wrap: anywhere; font-family: -apple-system, sans-serif; font-size: .78em; }
 
         /* Content Styling (Basic normalization for the book HTML) */
         .book-content img { max-width: 100%; height: auto; display: block; margin: 20px auto; }
@@ -44,6 +49,9 @@
     <div id="sidebar">
         <a href="/" class="nav-home">← Back to Library</a>
         <div class="nav-header">{{ book.metadata.title }}</div>
+        {% if book.source_url %}
+            <a class="source-link" href="{{ book.source_url }}" target="_blank" rel="noopener noreferrer">Original source ↗</a>
+        {% endif %}
 
         <!-- Recursive Macro for TOC -->
         {% macro render_toc(items) %}
@@ -96,6 +104,15 @@
 
     <!-- MAIN CONTENT -->
     <div id="main">
+        {% if document_type == "pdf" %}
+        <div class="content-container asset">
+            <iframe class="pdf-viewer" src="/read/{{ book_id }}/asset" title="{{ book.metadata.title }}"></iframe>
+        </div>
+        {% elif document_type == "image" %}
+        <div class="content-container asset image-viewer">
+            <img src="/read/{{ book_id }}/asset" alt="{{ book.metadata.title }}">
+        </div>
+        {% else %}
         <div class="content-container">
             <div class="book-content">
                 {{ current_chapter.content | safe }}
@@ -119,6 +136,7 @@
                 {% endif %}
             </div>
         </div>
+        {% endif %}
     </div>
 
     <script>
