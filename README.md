@@ -34,21 +34,19 @@ Reader 3 keeps the source document visible while preparing each section as porta
 - Image-only PDF pages use local Tesseract OCR when it is installed; imports still work without it.
 - Extracted raster figures use visible `Figure` captions when the PDF text contains them.
 - EPUB and HTML content use their existing section text.
-- **Copy Markdown** is the single full-section copy action; it includes the document title, section title, source pages, text, and extracted-image links.
-- Section titles, TOC entries, and individual paragraphs have nearby copy buttons.
-- **Explain**, **Summarize**, **Quiz me**, and user-defined prompt buttons run with the LLM selected under **⚙ AI settings**.
-- **Copy selection** handles shorter excerpts from EPUB and HTML documents.
+- Section-title and TOC copy icons copy the complete section as Markdown, including title, source pages, text, and extracted-image links. Paragraph icons copy only that paragraph.
+- **Explain**, **Summarize**, **Quiz me**, and user-defined prompt buttons run with the model selected in the reader toolbar.
 - **Copy image** prepares standalone images for a multimodal LLM.
 - PDF headings navigate without reloading the whole reader page.
 - The in-page **PDF / Markdown** control switches between the original layout and heading-scoped extracted text with page labels and available raster figures. Imported HTML and URLs similarly provide an **HTML / Markdown** switch.
-- Web handoff supports **ChatGPT** and **Claude**. On macOS, **Ask Gemini in Chrome** activates Chrome, opens its native Ask Gemini panel, pastes the current prompt, and submits it through local accessibility automation.
-- API-backed chat supports OpenAI Responses, Anthropic Messages, OpenAI-compatible endpoints such as Ollama, and Apple's on-device Foundation Model SDK when the host supports it.
-- The right-side AI chat panel saves multiple chat histories in browser local storage.
-- Provider, model, endpoint, and token changes take effect immediately without a save or close button.
+- Web handoff supports **ChatGPT** and **Claude**.
+- API-backed chat supports OpenAI Responses, Anthropic Messages, Google Gemini, OpenAI-compatible endpoints such as Ollama, and Apple's on-device Foundation Model SDK when the host supports it.
+- The persistent right-side Assistant panel saves multiple chat histories in browser local storage and uses smooth message/Thinking transitions.
+- **My page** stores global API tokens, provider model names, compatible endpoints, and custom prompt buttons. The reader toolbar only switches the active model.
 
-URL handoff is capped by the encoded query size to avoid HTTP 431 errors. Long sections are shortened; use **Copy Markdown** or an API-backed provider when the complete section is required. Ask Gemini automation may require granting Accessibility permission to the terminal or app running reader3 the first time it is used.
+URL handoff is capped by the encoded query size to avoid HTTP 431 errors. Long sections are shortened; use a section copy icon or an API-backed provider when the complete section is required.
 
-API tokens are stored only in the current browser's local storage and are sent through the localhost reader3 server for the selected provider request. They are not written to the document library. Apple Foundation Models currently require a supported Apple Silicon Mac and a compatible macOS/SDK; unavailable hosts show the reason in settings.
+API tokens are stored only in the current browser's local storage and are sent through the localhost reader3 server for the selected provider request. They are not written to the document library. Apple Foundation Models currently require a supported Apple Silicon Mac and a compatible macOS/SDK; unavailable hosts show the reason on My page.
 
 OCR quality depends on the scan and currently defaults to English. See [`docs/plan/llm-reading-mvp.md`](docs/plan/llm-reading-mvp.md) for the implemented scope and deferred work.
 

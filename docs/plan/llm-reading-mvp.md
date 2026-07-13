@@ -41,13 +41,12 @@ Keep old pickle files readable by using optional fields with defaults and `getat
 - Display the current PDF page range and extracted character count.
 - Add actions for:
   - copying the current section with title and source location;
-  - copying the user's current text selection;
   - running an explanation prompt with the selected LLM;
   - running a summary prompt with the selected LLM;
   - running a comprehension-quiz prompt with the selected LLM;
   - copying an image document for a multimodal LLM.
-- Keep web handoff available for ChatGPT, Claude, and Ask Gemini in Chrome.
-- Add a provider-neutral in-page chat API for OpenAI, Anthropic, OpenAI-compatible endpoints, and Apple Foundation Models.
+- Keep web handoff available for ChatGPT and Claude.
+- Add a provider-neutral in-page chat API for OpenAI, Anthropic, Google Gemini, OpenAI-compatible endpoints, and Apple Foundation Models.
 - Store provider choice, custom prompt buttons, and chat histories in browser local storage.
 - Keep API tokens out of reader3 files and use them only for the selected request.
 
@@ -86,17 +85,16 @@ The browser handoff and reading-performance follow-up adds:
 - a fast Markdown-style mode alongside the original PDF, with page labels and extracted raster figures;
 - lazy section-text loading and caching;
 - synchronous URL-query handoff links for ChatGPT and Claude, avoiding popup-blocker failures;
-- a macOS Ask Gemini action that activates Chrome, opens its native panel, pastes the prompt, and submits it;
 - an encoded-query-size URL limit with explicit truncation feedback, avoiding HTTP 431 errors after percent encoding.
 
 The integrated AI follow-up adds:
 
-- a gear menu for selecting web, API, compatible/local, or Apple on-device providers;
-- immediate provider-setting persistence without a separate save step;
+- a global My page for API tokens, provider models/endpoints, and custom prompts;
+- a model-only selector in the reader toolbar;
 - an HTML/Markdown view switch for imported HTML pages and URLs;
 - Explain, Summarize, Quiz, and custom prompt actions routed through the selected provider;
-- a right-side in-page chat panel with multiple locally saved chat histories;
+- a persistent assistant-ui-inspired right-side panel with multiple locally saved chat histories and motion;
 - per-section, per-paragraph, and TOC copy buttons;
-- a single structured **Copy Markdown** action instead of overlapping plain-section and Markdown actions.
+- copy icons at section, paragraph, and TOC granularity without duplicate toolbar actions.
 
-Configurable OCR, equation-to-LaTeX conversion, streaming AI responses, and keychain credential storage remain deferred. Ask Gemini automation is macOS-specific and depends on local Accessibility permission because Chrome does not expose a public web API for its privileged side panel.
+Configurable OCR, equation-to-LaTeX conversion, streaming AI responses, and keychain credential storage remain deferred. Chrome's native Ask Gemini automation was removed because Chrome exposes no supported API for injecting and submitting prompts to that privileged panel.

@@ -1,8 +1,6 @@
 import os
 import pickle
-import platform
 import re
-import subprocess
 import tempfile
 from functools import lru_cache
 from pathlib import Path
@@ -13,7 +11,6 @@ from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from starlette.concurrency import run_in_threadpool
-from pydantic import BaseModel, Field
 
 from importers import MAX_DOWNLOAD_BYTES, DocumentImportError, download_url, import_file
 from llm_providers import LLMChatRequest, LLMProviderError, call_llm, provider_status
@@ -27,7 +24,7 @@ BOOKS_DIR = "."
 AI_URL_MAX_ENCODED_CHARS = 6000
 AI_URL_TRUNCATION_NOTICE = (
     "\n\n[Reader 3 shortened this URL prompt to avoid a browser 431 error. "
-    "Use Copy Markdown or an API-backed provider for the complete section.]"
+    "Use the section copy icon or an API-backed provider for the complete section.]"
 )
 AI_PROVIDER_URLS = {
     "chatgpt": "https://chatgpt.com/?q=",
@@ -39,10 +36,6 @@ PROMPT_ACTIONS = {
     "summary": "Summarize this section. List the central claims, important definitions, and the minimum details needed to recall it later. Preserve references to source pages.",
     "quiz": "Tutor me on this section using retrieval practice. Ask one question at a time, wait for my answer, then give feedback and continue. Do not reveal all answers immediately.",
 }
-
-
-class GeminiChromeRequest(BaseModel):
-    prompt: str = Field(min_length=1, max_length=120_000)
 
 
 def encode_ai_url_prompt(prompt: str) -> str:
@@ -60,128 +53,6 @@ def encode_ai_url_prompt(prompt: str) -> str:
         else:
             high = middle - 1
     return quote(prompt[:low] + AI_URL_TRUNCATION_NOTICE, safe="")
-
-
-def run_gemini_chrome(prompt: str) -> None:
-    """Open Chrome's Ask Gemini panel, paste the prompt, and submit it on macOS."""
-    if platform.system() != "Darwin":
-        raise RuntimeError("Ask Gemini automation is available only on macOS")
-    script = r'''
-on findGeminiPromptField()
-    tell application "System Events"
-        tell process "Google Chrome"
-            try
-                set chromeElements to entire contents of front window
-                repeat with candidate in chromeElements
-                    try
-                        set candidateRole to value of attribute "AXRole" of candidate
-                        if candidateRole is in {"AXTextArea", "AXTextField", "AXComboBox"} then
-                            set markerText to ""
-                            try
-                                set markerText to value of attribute "AXPlaceholderValue" of candidate as text
-                            end try
-                            try
-                                set markerText to markerText & " " & (value of attribute "AXDescription" of candidate as text)
-                            end try
-                            try
-                                set markerText to markerText & " " & (value of attribute "AXHelp" of candidate as text)
-                            end try
-                            try
-                                set markerText to markerText & " " & (value of attribute "AXValue" of candidate as text)
-                            end try
-                            if markerText contains "Type / to use skills" or markerText contains "Ask Gemini" then
-                                return contents of candidate
-                            end if
-                        end if
-                    end try
-                end repeat
-            end try
-        end tell
-    end tell
-    return missing value
-end findGeminiPromptField
-
-on run argv
-    set promptText to item 1 of argv
-    set the clipboard to promptText
-    tell application "Google Chrome" to activate
-    delay 0.1
-    tell application "System Events"
-        set frontmost of process "Google Chrome" to true
-    end tell
-    set promptField to my findGeminiPromptField()
-    if promptField is missing value then
-        tell application "System Events" to key code 5 using {control down}
-        repeat 40 times
-            delay 0.1
-            set promptField to my findGeminiPromptField()
-            if promptField is not missing value then exit repeat
-        end repeat
-    end if
-    if promptField is missing value then
-        error "Ask Gemini's prompt field was not found."
-    end if
-    tell application "System Events"
-        try
-            set value of attribute "AXFocused" of promptField to true
-        end try
-        delay 0.05
-        set focusedElement to value of attribute "AXFocusedUIElement" of process "Google Chrome"
-        if focusedElement is not promptField then
-            try
-                perform action "AXPress" of promptField
-            end try
-            delay 0.05
-        end if
-        key code 0 using {command down}
-        key code 51
-        key code 9 using {command down}
-        delay 0.25
-        set insertedValue to ""
-        try
-            set insertedValue to value of attribute "AXValue" of focusedElement as text
-        end try
-        if insertedValue is not promptText then
-            error "Ask Gemini opened, but the inserted text did not match the prompt. The prompt remains on the clipboard."
-        end if
-        key code 36
-        set promptSubmitted to false
-        repeat 30 times
-            delay 0.1
-            try
-                set currentValue to value of attribute "AXValue" of focusedElement as text
-                if currentValue is "" or currentValue contains "Type / to use skills" then
-                    set promptSubmitted to true
-                    exit repeat
-                end if
-            on error
-                set promptSubmitted to true
-                exit repeat
-            end try
-        end repeat
-        if promptSubmitted is false then
-            error "The prompt was inserted, but reader3 could not confirm that Ask Gemini submitted it."
-        end if
-    end tell
-    return "submitted " & (count characters of insertedValue)
-end run
-'''
-    completed = subprocess.run(
-        ["osascript", "-e", script, prompt],
-        capture_output=True,
-        text=True,
-        timeout=15,
-        check=False,
-    )
-    if completed.returncode:
-        detail = (completed.stderr or completed.stdout).strip()
-        if "not allowed to send keystrokes" in detail:
-            raise RuntimeError(
-                "macOS blocked Chrome keyboard control. Enable Accessibility for the app "
-                "running reader3 in System Settings > Privacy & Security > Accessibility, "
-                "then retry. The prompt is already on the clipboard."
-            )
-        raise RuntimeError(detail or f"Chrome automation exited with status {completed.returncode}")
 
 
 def list_books():
@@ -228,6 +99,12 @@ async def library_view(request: Request):
         "message": request.query_params.get("message"),
         "error": request.query_params.get("error"),
     })
+
+
+@app.get("/me", response_class=HTMLResponse)
+async def my_page(request: Request):
+    """Global browser-local AI provider and prompt settings."""
+    return templates.TemplateResponse(request, "me.html", {"request": request})
 
 
 def _redirect_with(kind: str, message: str) -> RedirectResponse:
@@ -335,16 +212,6 @@ async def llm_chat(payload: LLMChatRequest):
     except Exception as exc:
         print(f"LLM request failed: {type(exc).__name__}")
         raise HTTPException(status_code=500, detail="The LLM request failed") from exc
-
-
-@app.post("/api/gemini/chrome")
-async def ask_gemini_in_chrome(payload: GeminiChromeRequest):
-    """Invoke Chrome's native Ask Gemini UI from the local macOS reader."""
-    try:
-        await run_in_threadpool(run_gemini_chrome, payload.prompt)
-        return {"opened": True}
-    except (RuntimeError, subprocess.SubprocessError) as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
 
 @app.get("/open/{provider}/{book_id}/{chapter_index}")

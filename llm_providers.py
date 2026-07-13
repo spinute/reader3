@@ -10,7 +10,7 @@ import httpx
 from pydantic import BaseModel, Field, field_validator
 
 
-ProviderName = Literal["openai", "anthropic", "openai-compatible", "apple-foundation"]
+ProviderName = Literal["openai", "anthropic", "google", "openai-compatible", "apple-foundation"]
 
 
 class ChatMessage(BaseModel):
@@ -60,7 +60,7 @@ def apple_foundation_status() -> dict[str, object]:
 def provider_status() -> dict[str, object]:
     return {
         "apple_foundation": apple_foundation_status(),
-        "providers": ["openai", "anthropic", "openai-compatible", "apple-foundation"],
+        "providers": ["openai", "anthropic", "google", "openai-compatible", "apple-foundation"],
     }
 
 
@@ -137,6 +137,42 @@ async def _call_anthropic(request: LLMChatRequest) -> str:
     return text
 
 
+async def _call_google(request: LLMChatRequest) -> str:
+    if not request.api_token:
+        raise LLMProviderError("Gemini API token is required")
+    model = request.model or "gemini-3.5-flash"
+    contents = [
+        {
+            "role": "model" if message.role == "assistant" else "user",
+            "parts": [{"text": message.content}],
+        }
+        for message in request.messages
+    ]
+    payload = {
+        "systemInstruction": {"parts": [{"text": request.instructions}]},
+        "contents": contents,
+    }
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.post(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
+            headers={"x-goog-api-key": request.api_token},
+            json=payload,
+        )
+    if response.is_error:
+        raise LLMProviderError(_error_message(response))
+    try:
+        text = "\n".join(
+            part.get("text", "")
+            for part in response.json()["candidates"][0]["content"]["parts"]
+            if part.get("text")
+        ).strip()
+    except (KeyError, IndexError, TypeError, AttributeError) as exc:
+        raise LLMProviderError("Gemini returned no text") from exc
+    if not text:
+        raise LLMProviderError("Gemini returned no text")
+    return text
+
+
 async def _call_openai_compatible(request: LLMChatRequest) -> str:
     base_url = request.base_url or "http://127.0.0.1:11434/v1"
     endpoint = base_url if base_url.endswith("/chat/completions") else f"{base_url}/chat/completions"
@@ -177,6 +213,8 @@ async def call_llm(request: LLMChatRequest) -> str:
             return await _call_openai(request)
         if request.provider == "anthropic":
             return await _call_anthropic(request)
+        if request.provider == "google":
+            return await _call_google(request)
         if request.provider == "openai-compatible":
             return await _call_openai_compatible(request)
         return await _call_apple_foundation(request)

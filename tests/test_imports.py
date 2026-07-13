@@ -239,17 +239,18 @@ class ServerTests(unittest.TestCase):
         self.assertIn("navigatePdfSection", reader_response.text)
         self.assertIn('value="chatgpt-web"', reader_response.text)
         self.assertIn('value="claude-web"', reader_response.text)
-        self.assertIn('value="gemini-chrome"', reader_response.text)
+        self.assertIn('value="google"', reader_response.text)
         self.assertIn('value="apple-foundation"', reader_response.text)
-        self.assertIn('id="settings-popover"', reader_response.text)
         self.assertIn('id="chat-panel"', reader_response.text)
-        self.assertIn("providerFieldChanged()", reader_response.text)
-        self.assertNotIn("Save settings", reader_response.text)
-        self.assertNotIn(">Done<", reader_response.text)
-        self.assertNotIn('id="provider-status"', reader_response.text)
+        self.assertIn("modelSelectionChanged()", reader_response.text)
+        self.assertNotIn("toggleChatPanel", reader_response.text)
+        self.assertNotIn(">Chat<", reader_response.text)
+        self.assertNotIn(">Copy Markdown<", reader_response.text)
+        self.assertNotIn(">Copy selection<", reader_response.text)
         self.assertIn("runPromptAction('explain')", reader_response.text)
         self.assertIn("copyTocSection", reader_response.text)
-        self.assertNotIn("gemini.google.com", reader_response.text)
+        self.assertNotIn('value="gemini-chrome"', reader_response.text)
+        self.assertNotIn("/api/gemini/chrome", reader_response.text)
         self.assertIn("frame.replaceWith(nextFrame)", reader_response.text)
         book_id = reader_url.split("/")[2]
         first_section_response = self.client.get(f"/read/{book_id}")
@@ -281,14 +282,15 @@ class ServerTests(unittest.TestCase):
         status_response = self.client.get("/api/llm/status")
         self.assertEqual(status_response.status_code, 200)
         self.assertIn("apple_foundation", status_response.json())
+        self.assertIn("google", status_response.json()["providers"])
 
         mocked_call = AsyncMock(return_value="A grounded answer")
         with patch("server.call_llm", mocked_call):
             response = self.client.post(
                 "/api/llm/chat",
                 json={
-                    "provider": "openai",
-                    "model": "gpt-5",
+                    "provider": "google",
+                    "model": "gemini-3.5-flash",
                     "api_token": "test-token",
                     "instructions": "Use the supplied text.",
                     "messages": [{"role": "user", "content": "Explain this."}],
@@ -304,40 +306,13 @@ class ServerTests(unittest.TestCase):
         self.assertLessEqual(len(encoded), server.AI_URL_MAX_ENCODED_CHARS)
         self.assertIn("avoid a browser 431 error", unquote(encoded))
 
-    def test_ask_gemini_uses_local_chrome_automation(self):
-        with patch("server.run_gemini_chrome") as mocked_run:
-            response = self.client.post(
-                "/api/gemini/chrome",
-                json={"prompt": "Explain this section."},
-            )
+    def test_my_page_contains_global_provider_settings(self):
+        response = self.client.get("/me")
         self.assertEqual(response.status_code, 200)
-        mocked_run.assert_called_once_with("Explain this section.")
-
-    def test_gemini_reports_empty_exit_error_after_submission(self):
-        completed = type("Completed", (), {"returncode": 1, "stderr": "", "stdout": ""})()
-        with patch("server.platform.system", return_value="Darwin"), patch(
-            "server.subprocess.run", return_value=completed
-        ):
-            with self.assertRaisesRegex(RuntimeError, "exited with status 1"):
-                server.run_gemini_chrome("Explain this section.")
-
-    def test_gemini_waits_for_prompt_focus_instead_of_fixed_delay(self):
-        completed = type("Completed", (), {"returncode": 0, "stderr": "", "stdout": "sent"})()
-        with patch("server.platform.system", return_value="Darwin"), patch(
-            "server.subprocess.run", return_value=completed
-        ) as mocked_run:
-            server.run_gemini_chrome("Explain this section.")
-        script = mocked_run.call_args.args[0][2]
-        self.assertIn("on findGeminiPromptField()", script)
-        self.assertIn("repeat 40 times", script)
-        self.assertIn('attribute "AXFocusedUIElement"', script)
-        self.assertIn('attribute "AXPlaceholderValue"', script)
-        self.assertIn('if promptField is missing value then', script)
-        self.assertIn("key code 51", script)
-        self.assertIn("if insertedValue is not promptText", script)
-        self.assertIn("if promptSubmitted is false", script)
-        self.assertNotIn('set value of attribute "AXValue"', script)
-        self.assertNotIn("delay 2.0", script)
+        self.assertIn('id="openai-token"', response.text)
+        self.assertIn('id="google-token"', response.text)
+        self.assertIn('id="compatible-url"', response.text)
+        self.assertIn('id="prompt-list"', response.text)
 
     def test_library_contains_upload_controls(self):
         response = self.client.get("/")
